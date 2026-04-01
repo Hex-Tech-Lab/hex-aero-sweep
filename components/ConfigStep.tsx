@@ -26,26 +26,55 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
     return passengerTypes[index] || 'adult';
   };
 
-  const handlePassengerTypeChange = useCallback((index: number, type: 'adult' | 'child' | 'infant') => {
-    setPassengerTypes(prev => ({ ...prev, [index]: type }));
-    
-    const breakdown = ticket.passengerBreakdown || {};
+  const computePassengerBreakdown = useCallback(() => {
     const counts = { adults: 0, children: 0, infants: 0 };
     
-    const updatedTypes = { ...passengerTypes, [index]: type };
-    Object.values(updatedTypes).forEach(t => {
-      counts[t === 'adult' ? 'adults' : t === 'child' ? 'children' : 'infants']++;
-    });
+    for (let i = 0; i < ticket.passengers.length; i++) {
+      const type = passengerTypes[i] || 'adult';
+      counts[type === 'adult' ? 'adults' : type === 'child' ? 'children' : 'infants']++;
+    }
+    
+    const total = counts.adults + counts.children + counts.infants;
+    if (total !== ticket.passengers.length) {
+      const deficit = ticket.passengers.length - total;
+      counts.adults += deficit;
+    }
+    
+    return {
+      adults: counts.adults,
+      children: counts.children,
+      infants: counts.infants,
+      manualOverride: ticket.passengerBreakdown?.manualOverride || Object.keys(passengerTypes).length > 0,
+      passengerTypeSource: 'MANUAL_VERIFICATION',
+    };
+  }, [passengerTypes, ticket.passengers.length, ticket.passengerBreakdown?.manualOverride]);
 
-    setTicket({
-      passengerBreakdown: {
-        ...breakdown,
-        ...counts,
-        manualOverride: true,
-        passengerTypeSource: 'MANUAL_VERIFICATION',
+  const handlePassengerTypeChange = useCallback((index: number, type: 'adult' | 'child' | 'infant') => {
+    setPassengerTypes(prev => {
+      const updatedTypes = { ...prev, [index]: type };
+      
+      const counts = { adults: 0, children: 0, infants: 0 };
+      Object.values(updatedTypes).forEach(t => {
+        counts[t === 'adult' ? 'adults' : t === 'child' ? 'children' : 'infants']++;
+      });
+      
+      const totalMarked = counts.adults + counts.children + counts.infants;
+      if (totalMarked < ticket.passengers.length) {
+        counts.adults += (ticket.passengers.length - totalMarked);
       }
+
+      setTicket({
+        passengerBreakdown: {
+          ...ticket.passengerBreakdown,
+          ...counts,
+          manualOverride: true,
+          passengerTypeSource: 'MANUAL_VERIFICATION',
+        }
+      });
+      
+      return updatedTypes;
     });
-  }, [passengerTypes, ticket.passengerBreakdown, setTicket]);
+  }, [ticket.passengers.length, ticket.passengerBreakdown, setTicket]);
 
   const handleSyncFromPNR = useCallback(async () => {
     if (!ticket.pnr) {
@@ -104,13 +133,16 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
     const startTime = Date.now();
     const sessionId = `sweep_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const totalPassengers = ticket.passengers.length;
+    const computedBreakdown = computePassengerBreakdown();
+    
+    setTicket({ passengerBreakdown: computedBreakdown });
 
     const searchConfig = {
       session_id: sessionId,
       pnr: ticket.pnr,
       passengers_count: ticket.passengers.length,
       fare_class: ticket.fareClass,
-      base_cost: ticket.baseCost,
+      base_cost: ticket.baseCost || 0,
       date_range_from: config.searchWindowStart ? new Date(config.searchWindowStart).toISOString().split('T')[0] : '',
       date_range_to: config.searchWindowEnd ? new Date(config.searchWindowEnd).toISOString().split('T')[0] : '',
       target_duration_min: config.minNights,

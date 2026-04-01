@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 
 type SSEMessage = {
-  type: 'metrics' | 'log' | 'candidate' | 'complete' | 'error';
+  type: 'metrics' | 'log' | 'candidate' | 'complete' | 'error' | 'progress';
   data: any;
 };
 
@@ -16,11 +16,9 @@ type UseSSEStreamOptions = {
   maxApiCalls: number;
   baseCost: number;
   passengers: number;
-  // Rebooking mode preferences
   directFlightOnly?: boolean;
   outboundTimePreference?: string;
   inboundTimePreference?: string;
-  // Passenger breakdown for child discount verification
   passengerBreakdown?: {
     adults?: number;
     children?: number;
@@ -31,17 +29,56 @@ type UseSSEStreamOptions = {
   onError?: (error: string) => void;
 };
 
+const BATCH_INTERVAL_MS = 500;
+const MAX_BATCH_SIZE = 100;
+
 export function useSSEStream() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const flushIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const candidateBufferRef = useRef<any[]>([]);
+  const metricsBufferRef = useRef<any>(null);
+  const logBufferRef = useRef<any[]>([]);
+  const isFlushingRef = useRef(false);
 
   const { setMetrics, addLog, addFlightResult, ticket } = useTicketStore();
+
+  const flushBuffers = useCallback(() => {
+    if (isFlushingRef.current) return;
+    isFlushingRef.current = true;
+
+    try {
+      if (candidateBufferRef.current.length > 0) {
+        const candidates = candidateBufferRef.current.splice(0, MAX_BATCH_SIZE);
+        candidates.forEach(candidate => addFlightResult(candidate));
+      }
+
+      if (metricsBufferRef.current) {
+        setMetrics(metricsBufferRef.current);
+        metricsBufferRef.current = null;
+      }
+
+      if (logBufferRef.current.length > 0) {
+        const logs = logBufferRef.current.splice(0, 50);
+        logs.forEach(log => addLog(log));
+      }
+    } finally {
+      isFlushingRef.current = false;
+    }
+  }, [setMetrics, addLog, addFlightResult]);
 
   const connect = (options: UseSSEStreamOptions) => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
+    if (flushIntervalRef.current) {
+      clearInterval(flushIntervalRef.current);
+    }
+
+    candidateBufferRef.current = [];
+    metricsBufferRef.current = null;
+    logBufferRef.current = [];
 
     const params = new URLSearchParams({
       sessionId: options.sessionId,
@@ -58,26 +95,25 @@ export function useSSEStream() {
       carrier: ticket.passengers.length > 0 ? 'A3' : 'A3',
       departureDate: ticket.departureDate ? new Date(ticket.departureDate).toISOString().split('T')[0] : '',
       returnDepartureDate: ticket.departureDate ? new Date(ticket.departureDate).toISOString().split('T')[0] : '',
-      // Rebooking mode preferences
       directFlightOnly: String(options.directFlightOnly ?? false),
       outboundTimePreference: options.outboundTimePreference || 'any',
       inboundTimePreference: options.inboundTimePreference || 'any',
     });
 
-    // Add passenger breakdown for child discount verification if available
     if (options.passengerBreakdown) {
       params.append('passengerBreakdown', JSON.stringify(options.passengerBreakdown));
     }
 
     const url = `/api/duffel-sweep?${params.toString()}`;
-
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
+
+    flushIntervalRef.current = setInterval(flushBuffers, BATCH_INTERVAL_MS);
 
     eventSource.onopen = () => {
       setIsConnected(true);
       setError(null);
-      setMetrics({ status: 'running' });
+      metricsBufferRef.current = { status: 'running' };
     };
 
     eventSource.onmessage = (event) => {
@@ -86,25 +122,32 @@ export function useSSEStream() {
 
         switch (message.type) {
           case 'metrics':
-            setMetrics({
+            metricsBufferRef.current = {
               totalScanned: message.data.totalScanned,
               candidatesFound: message.data.candidatesFound,
               outOfRange: message.data.outOfRange,
-            });
+            };
             break;
 
           case 'log':
-            addLog({
+            logBufferRef.current.push({
               level: message.data.level,
               message: message.data.message,
             });
+            if (logBufferRef.current.length > 200) {
+              logBufferRef.current = logBufferRef.current.slice(-200);
+            }
             break;
 
           case 'candidate':
-            addFlightResult(message.data);
+            candidateBufferRef.current.push(message.data);
+            if (candidateBufferRef.current.length > 5000) {
+              candidateBufferRef.current = candidateBufferRef.current.slice(-5000);
+            }
             break;
 
           case 'complete':
+            flushBuffers();
             setMetrics({
               status: 'completed',
               totalScanned: message.data.totalScanned,
@@ -116,11 +159,16 @@ export function useSSEStream() {
               message: `Sweep completed: ${message.data.candidatesFound} candidates found`,
             });
             eventSource.close();
+            if (flushIntervalRef.current) {
+              clearInterval(flushIntervalRef.current);
+              flushIntervalRef.current = null;
+            }
             setIsConnected(false);
             options.onComplete?.();
             break;
 
           case 'error':
+            flushBuffers();
             setError(message.data.message);
             setMetrics({ status: 'error' });
             addLog({
@@ -128,6 +176,10 @@ export function useSSEStream() {
               message: `Error: ${message.data.message}`,
             });
             eventSource.close();
+            if (flushIntervalRef.current) {
+              clearInterval(flushIntervalRef.current);
+              flushIntervalRef.current = null;
+            }
             setIsConnected(false);
             options.onError?.(message.data.message);
             break;
@@ -138,6 +190,7 @@ export function useSSEStream() {
     };
 
     eventSource.onerror = () => {
+      flushBuffers();
       setError('Connection lost');
       setMetrics({ status: 'error' });
       addLog({
@@ -145,6 +198,10 @@ export function useSSEStream() {
         message: 'SSE connection error',
       });
       eventSource.close();
+      if (flushIntervalRef.current) {
+        clearInterval(flushIntervalRef.current);
+        flushIntervalRef.current = null;
+      }
       setIsConnected(false);
     };
   };
@@ -153,19 +210,27 @@ export function useSSEStream() {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
-      setIsConnected(false);
-      setMetrics({ status: 'aborted' });
-      addLog({
-        level: 'warning',
-        message: 'Sweep manually aborted',
-      });
     }
+    if (flushIntervalRef.current) {
+      clearInterval(flushIntervalRef.current);
+      flushIntervalRef.current = null;
+    }
+    flushBuffers();
+    setIsConnected(false);
+    setMetrics({ status: 'aborted' });
+    addLog({
+      level: 'warning',
+      message: 'Sweep manually aborted',
+    });
   };
 
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+      }
+      if (flushIntervalRef.current) {
+        clearInterval(flushIntervalRef.current);
       }
     };
   }, []);

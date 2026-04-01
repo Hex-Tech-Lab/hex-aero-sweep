@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
+import { GlobalHeader } from '@/components/GlobalHeader';
 import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
 import { ConfigStep } from '@/components/ConfigStep';
@@ -36,6 +37,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      {currentStep !== 3 && <GlobalHeader mode="wizard" />}
+
       {currentStep !== 3 && (
         <WizardNav
           steps={steps}

@@ -61,6 +61,7 @@ export type FlightResult = {
   price: number;
   yieldDelta: number;
   status: string;
+  fareBrand?: string;
   metadata: Record<string, any>;
 };
 

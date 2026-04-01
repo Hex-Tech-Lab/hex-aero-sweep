@@ -21,10 +21,12 @@ export interface FlightCandidate {
   status: string;
   outboundSegments: FlightSegment[];
   inboundSegments: FlightSegment[];
+  fareBrand?: string;
   metadata: {
     phase: string;
     segments: number;
     bookingClass: string;
+    fareBrand?: string;
     layoverDuration?: string;
     timePreferences?: {
       outbound?: { preference: string; actual: string } | null;
@@ -52,6 +54,7 @@ export interface SearchPreferences {
     infants?: number;
     passengerTypeSource?: string;
   };
+  priceTolerance?: number;
 }
 
 const DUFFEL_API_KEY = process.env.DUFFEL_API_KEY;
@@ -96,6 +99,13 @@ function matchesRouteTopology(
   return true;
 }
 
+export interface SearchResult {
+  candidates: FlightCandidate[];
+  rawOffersCount: number;
+  rejectedCount: number;
+  rejectionReasons: string[];
+}
+
 export async function searchDuffelOffers(params: {
   origin: string;
   destination: string;
@@ -106,14 +116,14 @@ export async function searchDuffelOffers(params: {
   originalTicket?: OriginalTicketData;
   baseCost: number;
   preferences?: SearchPreferences;
-}): Promise<FlightCandidate[]> {
+}): Promise<SearchResult> {
   if (!duffelClient) {
     console.warn('[Duffel] Client not configured - skipping search');
-    return [];
+    return { candidates: [], rawOffersCount: 0, rejectedCount: 0, rejectionReasons: ['Duffel not configured'] };
   }
 
   const preferences = params.preferences || {};
-  const { outboundTimePreference = 'any', inboundTimePreference = 'any', directFlightOnly = false } = preferences;
+  const { outboundTimePreference = 'any', inboundTimePreference = 'any', directFlightOnly = false, priceTolerance = Infinity } = preferences;
 
   console.log('[Duffel] Executing search:', {
     route: `${params.origin} -> ${params.destination}`,
@@ -169,6 +179,11 @@ export async function searchDuffelOffers(params: {
       }
     }
 
+    const allowedCarriers = params.originalTicket?.carrier ? [params.originalTicket.carrier] : undefined;
+    if (allowedCarriers) {
+      console.log(`[Duffel] Filtering to allowed carriers: ${allowedCarriers.join(', ')}`);
+    }
+
     const offerRequest = await duffelClient.offerRequests.create({
       slices: [
         {
@@ -185,13 +200,17 @@ export async function searchDuffelOffers(params: {
       passengers: passengerArray as any,
       cabin_class: params.cabinClass,
       return_offers: true,
+      allowed_carriers: allowedCarriers,
     } as any);
 
     const offers = (offerRequest.data as any)?.offers || [];
+    const rawOffersCount = offers.length;
 
     console.log(`[Duffel] Retrieved ${offers.length} raw offers from API`);
 
     const candidates: FlightCandidate[] = [];
+    const rejectionReasons: string[] = [];
+    let rejectedCount = 0;
 
     for (const offer of offers) {
       const ownerCarrier = offer.owner?.iata_code;
@@ -199,6 +218,8 @@ export async function searchDuffelOffers(params: {
       if (params.originalTicket && ownerCarrier) {
         if (!matchesCarrier(ownerCarrier, params.originalTicket.carrier)) {
           console.log(`[Duffel] REJECTED: Carrier mismatch (${ownerCarrier} != ${params.originalTicket.carrier})`);
+          rejectedCount++;
+          rejectionReasons.push(`carrier_mismatch:${ownerCarrier}`);
           continue;
         }
       }
@@ -207,12 +228,16 @@ export async function searchDuffelOffers(params: {
       const inboundSlice = offer.slices?.[1];
 
       if (!outboundSlice || !inboundSlice) {
+        rejectedCount++;
+        rejectionReasons.push('missing_slices');
         continue;
       }
 
       if (params.originalTicket?.routeLegs) {
         if (!matchesRouteTopology(outboundSlice.segments, params.originalTicket.routeLegs)) {
           console.log('[Duffel] REJECTED: Route topology mismatch');
+          rejectedCount++;
+          rejectionReasons.push('route_topology_mismatch');
           continue;
         }
       }
@@ -220,17 +245,22 @@ export async function searchDuffelOffers(params: {
       // Apply Direct Flight filter
       if (directFlightOnly && outboundSlice.segments.length > 1) {
         console.log(`[Duffel] REJECTED: Direct flight only - outbound has ${outboundSlice.segments.length} segments`);
+        rejectedCount++;
+        rejectionReasons.push(`direct_only_outbound:${outboundSlice.segments.length}seg`);
         continue;
       }
 
       if (directFlightOnly && inboundSlice.segments.length > 1) {
         console.log(`[Duffel] REJECTED: Direct flight only - inbound has ${inboundSlice.segments.length} segments`);
+        rejectedCount++;
+        rejectionReasons.push(`direct_only_inbound:${inboundSlice.segments.length}seg`);
         continue;
       }
 
       // Apply Time Slot preference filtering
       const outboundDepartureTime = outboundSlice.segments[0]?.departing_at;
       const inboundDepartureTime = inboundSlice.segments[0]?.departing_at;
+      const fareBrand = outboundSlice.fare_brand_name || offer.cabin_class || 'Standard';
 
       if (outboundDepartureTime && !matchesTimePreference(outboundDepartureTime, outboundTimePreference)) {
         const actualSlot = getTimeSlot(outboundDepartureTime);
@@ -274,6 +304,14 @@ export async function searchDuffelOffers(params: {
         (new Date(returnDate).getTime() - new Date(departureDate).getTime()) / (1000 * 60 * 60 * 24)
       );
 
+      const roundedYieldDelta = Math.round(yieldDelta * 100) / 100;
+      const withinTolerance = Math.abs(roundedYieldDelta) <= priceTolerance;
+      const status = withinTolerance ? 'verified' : 'out_of_range';
+
+      if (!withinTolerance) {
+        console.log(`[Duffel] ${status.toUpperCase()}: ${ownerCarrier} ${departureDate} | Δ$${roundedYieldDelta.toFixed(2)} exceeds tolerance $${priceTolerance}`);
+      }
+
       candidates.push({
         id: offer.id,
         carrier: ownerCarrier || 'XX',
@@ -281,14 +319,16 @@ export async function searchDuffelOffers(params: {
         returnDate,
         nights,
         price,
-        yieldDelta: Math.round(yieldDelta * 100) / 100,
-        status: 'verified',
+        yieldDelta: roundedYieldDelta,
+        status,
         outboundSegments,
         inboundSegments,
+        fareBrand,
         metadata: {
           phase: 'LIVE DUFFEL',
           segments: outboundSlice.segments.length,
           bookingClass: outboundSlice.fare_brand_name || offer.cabin_class || 'Y',
+          fareBrand,
           timePreferences: {
             outbound: outboundTimePreference !== 'any' ? { preference: outboundTimePreference, actual: getTimeSlot(outboundDepartureTime) } : null,
             inbound: inboundTimePreference !== 'any' ? { preference: inboundTimePreference, actual: getTimeSlot(inboundDepartureTime) } : null,
@@ -297,17 +337,27 @@ export async function searchDuffelOffers(params: {
       });
     }
 
-    console.log(`[Duffel] Filtered to ${candidates.length} matching candidates`);
+    console.log(`[Duffel] Filtered to ${candidates.length} matching candidates (${rejectedCount} rejected)`);
 
     // Sort by time preference match if preferences are set
     if (outboundTimePreference !== 'any' || inboundTimePreference !== 'any') {
       console.log(`[Duffel] Sorting candidates by time preference match`);
     }
 
-    return candidates;
+    return {
+      candidates,
+      rawOffersCount,
+      rejectedCount,
+      rejectionReasons: rejectionReasons.slice(0, 10), // Limit to first 10 unique reasons
+    };
   } catch (error: any) {
     console.error('[Duffel] API error:', error.message || error);
-    return [];
+    return {
+      candidates: [],
+      rawOffersCount: 0,
+      rejectedCount: 0,
+      rejectionReasons: [`API_ERROR:${error.message || 'Unknown error'}`],
+    };
   }
 }
 

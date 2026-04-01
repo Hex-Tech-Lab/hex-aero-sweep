@@ -10,12 +10,14 @@ export function HeuristicPathChart() {
   const { flightResults } = useTicketStore();
 
   const chartData = useMemo(() => {
-    return flightResults.map((flight) => ({
+    const source = flightResults.slice(0, 500);
+    return source.map((flight) => ({
       nights: flight.nights,
       yield: flight.yieldDelta,
       carrier: flight.carrier,
       status: flight.status,
       price: flight.price,
+      id: flight.id,
     }));
   }, [flightResults]);
 
@@ -36,44 +38,47 @@ export function HeuristicPathChart() {
     };
   }, [chartData]);
 
+  const chartKey = `heuristic-${flightResults.length}`;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.1 }}
-      className="border border-slate-800 rounded-sm bg-slate-900/50 p-4"
+      key={chartKey}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="border border-slate-800 rounded-sm bg-slate-900/50 p-3"
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-            Heuristic Path Visualization
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+          <h3 className="text-[10px] font-semibold text-slate-300 uppercase tracking-wide">
+            Heuristic Path
           </h3>
         </div>
         {chartData.length > 0 && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
-            className="flex items-center gap-3 text-[10px]"
+            transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
+            className="flex items-center gap-2 text-[9px]"
           >
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-slate-400">{stats.positive} Savings</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="text-slate-400">{stats.positive}</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-slate-400" />
-              <span className="text-slate-400">{stats.neutral} Neutral</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              <span className="text-slate-400">{stats.neutral}</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-400" />
-              <span className="text-slate-400">{stats.negative} Premium</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="text-slate-400">{stats.negative}</span>
             </div>
           </motion.div>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={160}>
         {chartData.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -81,50 +86,50 @@ export function HeuristicPathChart() {
             transition={{ duration: 2, repeat: Infinity }}
             className="flex flex-col items-center justify-center h-full text-slate-600"
           >
-            <TrendingUp className="w-12 h-12 mb-2" />
-            <span className="text-xs uppercase tracking-wider">Awaiting Data Points...</span>
+            <TrendingUp className="w-8 h-8 mb-1" />
+            <span className="text-[10px] uppercase tracking-wider">Awaiting Data...</span>
           </motion.div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-          >
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis
-                dataKey="nights"
-                stroke="#475569"
-                style={{ fontSize: '10px' }}
-                label={{ value: 'Duration (nights)', position: 'bottom', fill: '#64748b', fontSize: 10 }}
-              />
-              <YAxis
-                dataKey="yield"
-                stroke="#475569"
-                style={{ fontSize: '10px' }}
-                label={{ value: 'Yield Delta ($)', angle: -90, position: 'left', fill: '#64748b', fontSize: 10 }}
-              />
-              <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" strokeWidth={1} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  borderRadius: '2px',
-                  fontSize: '12px',
-                }}
-                formatter={(value: any, name: string) => {
-                  if (name === 'yield') return [`$${value.toFixed(2)}`, 'Yield Delta'];
-                  if (name === 'price') return [`$${value.toFixed(2)}`, 'Total Price'];
-                  return [value, name];
-                }}
-              />
-              <Scatter data={chartData} animationDuration={1500}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={getColor(entry.status)} opacity={0.8} />
-                ))}
-              </Scatter>
-            </ScatterChart>
-          </motion.div>
+          <ScatterChart margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <XAxis
+              dataKey="nights"
+              stroke="#475569"
+              style={{ fontSize: '8px' }}
+              label={{ value: 'Nights', position: 'bottom', fill: '#64748b', fontSize: 8 }}
+              domain={[0, 'auto']}
+              type="number"
+            />
+            <YAxis
+              dataKey="yield"
+              stroke="#475569"
+              style={{ fontSize: '8px' }}
+              label={{ value: 'Yield', angle: -90, position: 'left', fill: '#64748b', fontSize: 8 }}
+            />
+            <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" strokeWidth={1} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#0f172a',
+                border: '1px solid #334155',
+                borderRadius: '2px',
+                fontSize: '10px',
+              }}
+              formatter={(value: any, name: string) => {
+                if (name === 'yield') return [`$${Number(value).toFixed(2)}`, 'Yield'];
+                if (name === 'price') return [`$${Number(value).toFixed(2)}`, 'Price'];
+                return [value, name];
+              }}
+            />
+            <Scatter data={chartData} isAnimationActive={false}>
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${entry.id || index}`}
+                  fill={getColor(entry.status)}
+                  fillOpacity={0.7}
+                />
+              ))}
+            </Scatter>
+          </ScatterChart>
         )}
       </ResponsiveContainer>
     </motion.div>

@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
 type MetricCardProps = {
   label: string;
-  value: number | string;
+  value: ReactNode;
   icon?: LucideIcon;
   variant?: 'default' | 'success' | 'warning' | 'error';
   className?: string;

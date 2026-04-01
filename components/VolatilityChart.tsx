@@ -1,7 +1,7 @@
 'use client';
 
 import { useTicketStore } from '@/src/store/useTicketStore';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Activity } from 'lucide-react';
@@ -12,62 +12,93 @@ export function VolatilityChart() {
   const chartData = useMemo(() => {
     if (flightResults.length === 0) return [];
 
-    const groupedByDate = flightResults.reduce((acc, flight) => {
-      if (!acc[flight.departureDate]) {
-        acc[flight.departureDate] = [];
-      }
-      acc[flight.departureDate].push(flight.price);
-      return acc;
-    }, {} as Record<string, number[]>);
+    const verified = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
+    
+    if (verified.length === 0) {
+      return flightResults.slice(0, 500).map((flight, index) => ({
+        index,
+        date: flight.departureDate,
+        price: flight.price,
+        yieldDelta: flight.yieldDelta,
+        status: flight.status,
+      }));
+    }
 
-    return Object.entries(groupedByDate)
-      .map(([date, prices]) => ({
-        date,
-        avgPrice: prices.reduce((sum, p) => sum + p, 0) / prices.length,
-        minPrice: Math.min(...prices),
-        maxPrice: Math.max(...prices),
-      }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return verified.slice(0, 500).map((flight, index) => ({
+      index,
+      date: flight.departureDate,
+      price: flight.price,
+      yieldDelta: flight.yieldDelta,
+      status: flight.status,
+    }));
   }, [flightResults]);
 
-  const volatilityScore = useMemo(() => {
-    if (chartData.length < 2) return 0;
-    const prices = chartData.map(d => d.avgPrice);
+  const volatilityMetrics = useMemo(() => {
+    const verified = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
+    const source = verified.length > 0 ? verified : flightResults;
+    
+    if (source.length < 2) return { stdDev: 0, priceSpan: 0, minPrice: 0, maxPrice: 0 };
+    
+    const prices = source.map(f => f.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
     const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length;
     const variance = prices.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / prices.length;
-    return Math.sqrt(variance);
-  }, [chartData]);
+    const stdDev = Math.sqrt(variance);
+    const priceSpan = maxPrice - minPrice;
+    
+    return { stdDev, priceSpan, minPrice, maxPrice };
+  }, [flightResults]);
+
+  const chartKey = `volatility-${flightResults.length}`;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="border border-slate-800 rounded-sm bg-slate-900/50 p-4"
+      key={chartKey}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className="border border-slate-800 rounded-sm bg-slate-900/50 p-3"
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-            Price Volatility Analysis
+          <Activity className="w-3.5 h-3.5 text-cyan-400" />
+          <h3 className="text-[10px] font-semibold text-slate-300 uppercase tracking-wide">
+            Price Volatility
           </h3>
         </div>
         {chartData.length > 0 && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-            className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded"
+            transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
+            className="flex items-center gap-2 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded text-[10px]"
           >
-            <span className="text-[10px] text-slate-400 uppercase">Volatility</span>
-            <span className="text-sm font-mono font-bold text-cyan-400">
-              ${volatilityScore.toFixed(2)}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-slate-500">Min</span>
+              <span className="font-mono font-bold text-emerald-400">
+                ${volatilityMetrics.minPrice.toFixed(0)}
+              </span>
+            </div>
+            <div className="w-px h-3 bg-slate-700" />
+            <div className="flex items-center gap-1">
+              <span className="text-slate-500">Max</span>
+              <span className="font-mono font-bold text-red-400">
+                ${volatilityMetrics.maxPrice.toFixed(0)}
+              </span>
+            </div>
+            <div className="w-px h-3 bg-slate-700" />
+            <div className="flex items-center gap-1">
+              <span className="text-slate-500">Span</span>
+              <span className="font-mono font-bold text-cyan-400">
+                ${volatilityMetrics.priceSpan.toFixed(0)}
+              </span>
+            </div>
           </motion.div>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={160}>
         {chartData.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -75,79 +106,52 @@ export function VolatilityChart() {
             transition={{ duration: 2, repeat: Infinity }}
             className="flex flex-col items-center justify-center h-full text-slate-600"
           >
-            <Activity className="w-12 h-12 mb-2" />
-            <span className="text-xs uppercase tracking-wider">Awaiting Price Stream...</span>
+            <Activity className="w-8 h-8 mb-1" />
+            <span className="text-[10px] uppercase tracking-wider">Awaiting Stream...</span>
           </motion.div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis
-                dataKey="date"
-                stroke="#475569"
-                style={{ fontSize: '10px' }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis stroke="#475569" style={{ fontSize: '10px' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  borderRadius: '2px',
-                  fontSize: '12px',
-                }}
-                formatter={(value: any) => [`$${value.toFixed(2)}`, 'Price']}
-              />
-              <Legend wrapperStyle={{ fontSize: '10px' }} />
-              <Line
-                type="monotone"
-                dataKey="avgPrice"
-                stroke="#06b6d4"
-                strokeWidth={2}
-                dot={{ fill: '#06b6d4', r: 3 }}
-                name="Avg Price"
-                animationDuration={1500}
-              />
-              <Line
-                type="monotone"
-                dataKey="minPrice"
-                stroke="#10b981"
+          <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <XAxis
+              dataKey="date"
+              stroke="#475569"
+              style={{ fontSize: '8px' }}
+              angle={-45}
+              textAnchor="end"
+              height={40}
+              tickFormatter={(val) => String(val).replace('2026-', '').substring(0, 5)}
+            />
+            <YAxis stroke="#475569" style={{ fontSize: '8px' }} domain={['auto', 'auto']} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#0f172a',
+                border: '1px solid #334155',
+                borderRadius: '2px',
+                fontSize: '10px',
+              }}
+              formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Price']}
+            />
+            <Legend wrapperStyle={{ fontSize: '8px' }} />
+            <Line
+              type="monotone"
+              dataKey="price"
+              stroke="#06b6d4"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={{ r: 4, fill: '#06b6d4' }}
+              name="Price"
+              isAnimationActive={false}
+            />
+            {ticket.baseCost > 0 && (
+              <ReferenceLine
+                y={ticket.baseCost}
+                stroke="#ef4444"
                 strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
-                name="Min Price"
-                animationDuration={1500}
+                strokeDasharray="4 4"
+                label={{ value: 'Base', position: 'right', fill: '#ef4444', fontSize: 8 }}
               />
-              <Line
-                type="monotone"
-                dataKey="maxPrice"
-                stroke="#f97316"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
-                name="Max Price"
-                animationDuration={1500}
-              />
-              {ticket.baseCost > 0 && (
-                <Line
-                  type="monotone"
-                  dataKey={() => ticket.baseCost}
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                  name="Base Cost"
-                  animationDuration={800}
-                />
-              )}
-            </LineChart>
-          </motion.div>
+            )}
+          </LineChart>
         )}
       </ResponsiveContainer>
     </motion.div>

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { updateSearchLog } from '@/lib/supabase-operations';
-import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData } from '@/lib/duffel-service';
+import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult } from '@/lib/duffel-service';
 
 type SSEMessage = {
   type: 'metrics' | 'log' | 'candidate' | 'complete' | 'error' | 'duffel_payload';
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
             });
 
             try {
-              const candidates = await searchDuffelOffers({
+              const searchResult: SearchResult = await searchDuffelOffers({
                 origin,
                 destination,
                 departureDate,
@@ -186,30 +186,40 @@ export async function GET(request: NextRequest) {
                 },
               });
 
+              const { candidates, rawOffersCount, rejectedCount } = searchResult;
+
+              // Send raw offers count to frontend
+              totalScanned += rawOffersCount;
+              outOfRange += rejectedCount;
+
+              sendMessage({
+                type: 'metrics',
+                data: {
+                  totalScanned,
+                  candidatesFound,
+                  outOfRange,
+                  rawOffersCount,
+                  rejectedCount,
+                },
+              });
+
               if (DEVELOPER_VERBOSE_MODE && candidates.length > 0) {
                 sendMessage({
                   type: 'duffel_payload',
                   data: {
                     query: { origin, destination, departureDate, returnDate },
                     candidatesReturned: candidates.length,
+                    rawOffersCount,
                     rawPayload: candidates,
                   },
                 });
               }
 
-              totalScanned += candidates.length;
-
               for (const candidate of candidates) {
-                const withinTolerance = Math.abs(candidate.yieldDelta) <= priceTolerance;
-
-                if (withinTolerance) {
+                const isVerified = candidate.status === 'verified';
+                
+                if (isVerified) {
                   candidatesFound++;
-
-                  sendMessage({
-                    type: 'candidate',
-                    data: candidate,
-                  });
-
                   sendMessage({
                     type: 'log',
                     data: {
@@ -219,7 +229,19 @@ export async function GET(request: NextRequest) {
                   });
                 } else {
                   outOfRange++;
+                  sendMessage({
+                    type: 'log',
+                    data: {
+                      level: 'warning',
+                      message: `[OUT OF RANGE] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} exceeds Δ$${candidate.yieldDelta.toFixed(2)}`,
+                    },
+                  });
                 }
+
+                sendMessage({
+                  type: 'candidate',
+                  data: candidate,
+                });
               }
 
               sendMessage({
@@ -228,6 +250,9 @@ export async function GET(request: NextRequest) {
                   totalScanned,
                   candidatesFound,
                   outOfRange,
+                  rawOffersCount,
+                  rejectedCount,
+                  progress: `${totalApiCalls}/${maxApiCalls}`,
                 },
               });
 
