@@ -33,19 +33,26 @@ export interface TCExtractionSchema {
   arrivalAirport?: string;
   departureDate?: string;
   arrivalDate?: string;
+  returnFlightNumber?: string | null;
+  returnDepartureDate?: string | null;
+  isRoundTrip?: boolean;
   issueDate?: string;
+  expirationDate?: string | null;
   flightNumber?: string;
   fareClass?: string;
   baseFare?: number;
   passengerBreakdown?: {
     adults?: number;
     children?: number;
+    infants?: number;
+    passengerTypeSource?: string;
   };
   baggage?: {
     checked?: string;
     carry?: string;
   };
   baggageAllowance?: string;
+  baggagePromoDetails?: string;
   validity?: string;
   cancellationPolicy?: string;
   changePolicy?: string;
@@ -197,6 +204,19 @@ CRITICAL EXTRACTION RULES:
 4. Primary Passenger Last Name: You must identify the Primary Passenger's last name. To find this, look at the "Contact" section, the first listed adult, or the passenger with Frequent Flyer miles assigned. The GDS lookup will fail if this is not the main booking contact. Extract ONLY the last name.
 5. Airports: Use 3-letter IATA codes only.
 6. Dates: Use ISO 8601 format (YYYY-MM-DD or full timestamp).
+7. Round Trip Detection: Identify if a return flight exists and extract its details (returnFlightNumber, returnDepartureDate). Set isRoundTrip to true if present.
+8. Baggage Promos: Extract any mention of luggage discounts or time-sensitive promos (e.g., "50% off within 24h", "pre-purchase", "early bird bonus bags") in the baggagePromoDetails field.
+9. PASSENGER AGE VERIFICATION (HARD RULE):
+   - DO NOT use external knowledge or names (e.g., Lara, Maya) to guess age categories.
+   - Search ONLY for explicit age markers in the document:
+     * SSR codes: CHLD, INFT, or similar child/infant service requests
+     * Fare basis suffixes: /CH, /IN, /C15, /I99, etc.
+     * Type columns: "CHILD", "INFANT", "ADULT" labels
+     * Age ranges in text: "2-11" (child), "under 2" (infant)
+   - If NO age-specific marker exists in the text, you MUST return all passengers as 'Adults'.
+   - The 'passengerTypeSource' field MUST contain the EXACT substring from the PDF that confirms the age category (e.g., "TNN/CH", "SSR CHLD", "Type: CHILD").
+   - If no marker is found, the field MUST say 'NO_MARKER_FOUND'.
+   - Never guess or assume ages from passenger names.
 
 Return a JSON object with these fields:
 {
@@ -210,10 +230,15 @@ Return a JSON object with these fields:
   "arrivalAirport": "string (IATA)",
   "departureDate": "string (ISO format)",
   "arrivalDate": "string (ISO format)",
+  "returnFlightNumber": "string or null (flight number of return leg)",
+  "returnDepartureDate": "string or null (ISO format of return date)",
+  "isRoundTrip": "boolean (true if return flight exists)",
   "flightNumber": "string",
   "fareClass": "string",
   "baseFare": number,
   "baggage": {"checked": "string", "carry": "string"},
+  "baggagePromoDetails": "string (any promo offers for baggage, e.g., '50% off within 24h')",
+  "passengerBreakdown": {"adults": number, "children": number, "infants": number, "passengerTypeSource": "string (EXACT text marker or 'NO_MARKER_FOUND')"},
   "cancellationPolicy": "string",
   "changePolicy": "string"
 }
@@ -253,6 +278,59 @@ MANDATORY: Output ONLY valid JSON. Do not wrap in markdown. Do not infer data no
       try {
         const cleanText = content.replace(/```json/gi, '').replace(/```/g, '').trim();
         extractedData = JSON.parse(cleanText);
+        
+        // Ensure expirationDate is valid or calculate fallback
+        if (!extractedData.expirationDate) {
+          // If expirationDate is missing, set it to 365 days after the departureDate
+          if (extractedData.departureDate) {
+            const departureDate = new Date(extractedData.departureDate);
+            if (!isNaN(departureDate.getTime())) {
+              const expirationDate = new Date(departureDate);
+              expirationDate.setDate(expirationDate.getDate() + 365);
+              extractedData.expirationDate = expirationDate.toISOString().split('T')[0];
+            }
+          }
+        } else {
+          // Validate the date
+          const date = new Date(extractedData.expirationDate);
+          if (isNaN(date.getTime())) {
+            extractedData.expirationDate = null;
+          }
+        }
+
+        // VERIFY PASSENGER BREAKDOWN against passengerTypeSource
+        // This ensures child passengers are correctly identified for discount capture
+        if (extractedData.passengerBreakdown) {
+          const source = extractedData.passengerBreakdown.passengerTypeSource;
+          
+          // Check if source explicitly confirms child passengers (CH indicator)
+          if (source && (source.toUpperCase().includes('CH') || source.toLowerCase().includes('child'))) {
+            // Verify children count is set
+            if (!extractedData.passengerBreakdown.children || extractedData.passengerBreakdown.children === 0) {
+              // Source confirmed CH but no children listed - flag for review
+              console.warn('[OpenRouter] PASSENGER VERIFICATION: Source confirms CH but children count is 0 - flagged for manual review');
+              
+              // Attempt to infer from total passenger count vs adults
+              const totalPassengers = extractedData.passengers?.length || extractedData.passengerCount || 0;
+              const adults = extractedData.passengerBreakdown.adults || 0;
+              if (totalPassengers > adults && totalPassengers > 0) {
+                // Infer child passengers
+                extractedData.passengerBreakdown.children = totalPassengers - adults;
+                console.log(`[OpenRouter] PASSENGER VERIFICATION: Inferred ${extractedData.passengerBreakdown.children} child passenger(s) from passenger count`);
+              }
+            }
+            
+            // Ensure passengerTypeSource is set for downstream processing
+            if (!extractedData.passengerBreakdown.passengerTypeSource) {
+              extractedData.passengerBreakdown.passengerTypeSource = source;
+            }
+            
+            console.log(`[OpenRouter] PASSENGER VERIFICATION: Child passenger source confirmed: "${source}" - ${extractedData.passengerBreakdown.children} child(ren) identified for discount capture`);
+          } else if (source && source.toLowerCase().includes('unknown')) {
+            // Source indicates unknown passenger types - warn but don't override
+            console.warn('[OpenRouter] PASSENGER VERIFICATION: passengerTypeSource marked as unknown - adult pricing may apply');
+          }
+        }
       } catch (parseError) {
         const errorMsg = `Invalid JSON response from ${modelConfig.id}`;
         await telemetryCollector.recordAttempt(modelConfig.id, latencyMs, false);

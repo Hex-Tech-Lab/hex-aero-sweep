@@ -4,14 +4,19 @@ import { persist, PersistStorage } from 'zustand/middleware';
 export type TicketData = {
   pnr: string;
   primaryPassengerLastName: string;
-  passengers: {
-    adults: number;
-    children: number;
-  };
+  passengers: string[];
   fareClass: string;
   baseCost: number;
   issueDate: Date | null;
   expirationDate: Date | null;
+  departureDate: Date | null; // Original departure date for rebooking detection
+  passengerBreakdown?: {
+    adults?: number;
+    children?: number;
+    infants?: number;
+    passengerTypeSource?: string;
+    manualOverride?: boolean;
+  };
   rules: {
     validity: string;
     luggage: string;
@@ -26,6 +31,11 @@ export type ConfigData = {
   maxNights: number;
   priceTolerance: number;
   maxApiCalls: number;
+  // Rebooking mode preferences
+  directFlightOnly: boolean;
+  timePreference: 'any' | 'morning' | 'evening';
+  outboundTimePreference: 'any' | 'morning' | 'afternoon' | 'evening';
+  inboundTimePreference: 'any' | 'morning' | 'afternoon' | 'evening';
 };
 
 export type ExecutionMetrics = {
@@ -76,19 +86,18 @@ type TicketStore = {
   isTicketExpired: () => boolean;
   isTicketValid: () => boolean;
   isConfigValid: () => boolean;
+  isRebookingMode: () => boolean;
 };
 
 const initialTicket: TicketData = {
   pnr: '',
   primaryPassengerLastName: '',
-  passengers: {
-    adults: 1,
-    children: 0,
-  },
+  passengers: [],
   fareClass: 'ECONOMY',
   baseCost: 0,
   issueDate: null,
   expirationDate: null,
+  departureDate: null,
   rules: {
     validity: '',
     luggage: '',
@@ -103,6 +112,11 @@ const initialConfig: ConfigData = {
   maxNights: 14,
   priceTolerance: 50,
   maxApiCalls: 100,
+  // Rebooking mode preferences
+  directFlightOnly: false,
+  timePreference: 'any',
+  outboundTimePreference: 'any',
+  inboundTimePreference: 'any',
 };
 
 const initialMetrics: ExecutionMetrics = {
@@ -173,7 +187,13 @@ export const useTicketStore = create<TicketStore, [["zustand/persist", TicketSto
   resetStore: () =>
     set({
       ticket: initialTicket,
-      config: initialConfig,
+      config: {
+        ...initialConfig,
+        directFlightOnly: false,
+        timePreference: 'any',
+        outboundTimePreference: 'any',
+        inboundTimePreference: 'any',
+      },
       metrics: initialMetrics,
       logs: [],
       flightResults: [],
@@ -187,13 +207,19 @@ export const useTicketStore = create<TicketStore, [["zustand/persist", TicketSto
     return new Date(ticket.expirationDate) < new Date();
   },
 
+  isRebookingMode: () => {
+    const { ticket } = get();
+    // Rebooking mode: original departure is in the past
+    if (!ticket.departureDate) return false;
+    return new Date(ticket.departureDate) < new Date();
+  },
+
   isTicketValid: () => {
     const { ticket } = get();
-    const totalPassengers = ticket.passengers.adults + ticket.passengers.children;
     return (
       ticket.pnr.length >= 6 &&
       (ticket.primaryPassengerLastName || '').length > 0 &&
-      totalPassengers > 0 &&
+      ticket.passengers.length > 0 &&
       ticket.baseCost > 0 &&
       ticket.issueDate !== null &&
       ticket.expirationDate !== null
@@ -203,16 +229,29 @@ export const useTicketStore = create<TicketStore, [["zustand/persist", TicketSto
   isConfigValid: () => {
     const { config, ticket } = get();
 
-    if (!ticket.expirationDate) return false;
+    // For rebooking mode (original departure in past), allow any future date in 2026
+    const isRebooking = ticket.departureDate && new Date(ticket.departureDate) < new Date();
+
+    if (!ticket.expirationDate && !isRebooking) return false;
 
     const hasValidDates =
       config.searchWindowStart !== null &&
       config.searchWindowEnd !== null &&
       config.searchWindowStart <= config.searchWindowEnd;
 
-    const isWithinExpiration =
+    // In rebooking mode, validate against 2026-12-31; otherwise use expiration date
+    const maxAllowedDate = isRebooking
+      ? new Date('2026-12-31')
+      : new Date(ticket.expirationDate!);
+
+    const isWithinAllowedPeriod =
       config.searchWindowEnd !== null &&
-      new Date(config.searchWindowEnd) <= new Date(ticket.expirationDate);
+      new Date(config.searchWindowEnd) <= maxAllowedDate;
+
+    // Also ensure start date is in the future
+    const isStartInFuture =
+      config.searchWindowStart !== null &&
+      new Date(config.searchWindowStart) >= new Date();
 
     const hasValidNights =
       config.minNights > 0 &&
@@ -224,7 +263,8 @@ export const useTicketStore = create<TicketStore, [["zustand/persist", TicketSto
 
     return (
       hasValidDates &&
-      isWithinExpiration &&
+      isWithinAllowedPeriod &&
+      isStartInFuture &&
       hasValidNights &&
       hasValidTolerance &&
       hasValidApiCalls

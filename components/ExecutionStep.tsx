@@ -52,13 +52,20 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
     const sweepParams = {
       sessionId: sweepExecutionId,
-      searchWindowStart: config.searchWindowStart.toISOString().split('T')[0],
-      searchWindowEnd: config.searchWindowEnd.toISOString().split('T')[0],
+      searchWindowStart: new Date(config.searchWindowStart).toISOString().split('T')[0],
+      searchWindowEnd: new Date(config.searchWindowEnd).toISOString().split('T')[0],
       minNights: config.minNights,
       maxNights: config.maxNights,
       priceTolerance: config.priceTolerance,
       maxApiCalls: config.maxApiCalls,
       baseCost: ticket.baseCost,
+      passengers: ticket.passengers.length,
+      // Rebooking mode preferences
+      directFlightOnly: config.directFlightOnly,
+      outboundTimePreference: config.outboundTimePreference,
+      inboundTimePreference: config.inboundTimePreference,
+      // Passenger breakdown for child discount verification
+      passengerBreakdown: ticket.passengerBreakdown,
     };
 
     addTelemetryLog({

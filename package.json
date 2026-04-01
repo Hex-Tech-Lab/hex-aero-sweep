@@ -76,6 +76,8 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@types/pdf-parse": "^1.1.4"
+    "@lancedb/lancedb": "0.21.2",
+    "@types/pdf-parse": "^1.1.4",
+    "apache-arrow": "18.1.0"
   }
 }

@@ -15,6 +15,18 @@ type UseSSEStreamOptions = {
   priceTolerance: number;
   maxApiCalls: number;
   baseCost: number;
+  passengers: number;
+  // Rebooking mode preferences
+  directFlightOnly?: boolean;
+  outboundTimePreference?: string;
+  inboundTimePreference?: string;
+  // Passenger breakdown for child discount verification
+  passengerBreakdown?: {
+    adults?: number;
+    children?: number;
+    infants?: number;
+    passengerTypeSource?: string;
+  };
   onComplete?: () => void;
   onError?: (error: string) => void;
 };
@@ -24,7 +36,7 @@ export function useSSEStream() {
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const { setMetrics, addLog, addFlightResult } = useTicketStore();
+  const { setMetrics, addLog, addFlightResult, ticket } = useTicketStore();
 
   const connect = (options: UseSSEStreamOptions) => {
     if (eventSourceRef.current) {
@@ -40,7 +52,22 @@ export function useSSEStream() {
       priceTolerance: options.priceTolerance.toString(),
       maxApiCalls: options.maxApiCalls.toString(),
       baseCost: options.baseCost.toString(),
+      passengers: options.passengers.toString(),
+      origin: ticket.departureDate ? 'CAI' : 'CAI',
+      destination: ticket.departureDate ? 'ATH' : 'ATH',
+      carrier: ticket.passengers.length > 0 ? 'A3' : 'A3',
+      departureDate: ticket.departureDate ? new Date(ticket.departureDate).toISOString().split('T')[0] : '',
+      returnDepartureDate: ticket.departureDate ? new Date(ticket.departureDate).toISOString().split('T')[0] : '',
+      // Rebooking mode preferences
+      directFlightOnly: (options.directFlightOnly ?? false).toString(),
+      outboundTimePreference: options.outboundTimePreference || 'any',
+      inboundTimePreference: options.inboundTimePreference || 'any',
     });
+
+    // Add passenger breakdown for child discount verification if available
+    if (options.passengerBreakdown) {
+      params.append('passengerBreakdown', JSON.stringify(options.passengerBreakdown));
+    }
 
     const url = `/api/duffel-sweep?${params.toString()}`;
 

@@ -29,7 +29,39 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
   const { ticket, setTicket, isTicketValid, resetStore } = useTicketStore();
   const { addLog } = useTelemetryStore();
 
-  const handlePDFUpload = async (file: File) => {
+  const simulateProcessing = useCallback(() => {
+    setProcessingState('processing');
+    setProgress(0);
+    setProcessingMessage(PROCESSING_MESSAGES[0]);
+
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 4;
+      });
+    }, 100);
+
+    let messageIndex = 0;
+    const messageInterval = setInterval(() => {
+      messageIndex++;
+      if (messageIndex < PROCESSING_MESSAGES.length) {
+        setProcessingMessage(PROCESSING_MESSAGES[messageIndex]);
+      } else {
+        clearInterval(messageInterval);
+      }
+    }, 400);
+
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      clearInterval(messageInterval);
+      setProcessingState('authenticated');
+    }, 2500);
+  }, []);
+
+  const handlePDFUpload = useCallback(async (file: File) => {
     setIsParsing(true);
     simulateProcessing();
 
@@ -87,14 +119,18 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
         baseCost: result.data.baseCost,
         issueDate: new Date(result.data.issueDate),
         expirationDate: new Date(result.data.expirationDate),
+        departureDate: result.data.departureDate ? new Date(result.data.departureDate) : null,
+        passengerBreakdown: result.data.passengerBreakdown,
         rules: result.data.rules,
       });
 
+      setIsParsing(false);
+      setProcessingState('idle');
       toast.success('PDF parsed successfully');
+      onNext();
     } catch (error) {
       clearTimeout(timeoutId);
       setProcessingState('idle');
-      setIsParsing(false);
 
       if (error instanceof Error && error.name === 'AbortError') {
         addLog({
@@ -107,40 +143,10 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
       } else {
         toast.error(error instanceof Error ? error.message : 'Failed to parse PDF');
       }
+    } finally {
+      setIsParsing(false);
     }
-  };
-
-  const simulateProcessing = () => {
-    setProcessingState('processing');
-    setProgress(0);
-    setProcessingMessage(PROCESSING_MESSAGES[0]);
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 4;
-      });
-    }, 100);
-
-    let messageIndex = 0;
-    const messageInterval = setInterval(() => {
-      messageIndex++;
-      if (messageIndex < PROCESSING_MESSAGES.length) {
-        setProcessingMessage(PROCESSING_MESSAGES[messageIndex]);
-      } else {
-        clearInterval(messageInterval);
-      }
-    }, 400);
-
-    setTimeout(() => {
-      clearInterval(progressInterval);
-      clearInterval(messageInterval);
-      setProcessingState('authenticated');
-    }, 2500);
-  };
+  }, [addLog, setTicket, onNext, simulateProcessing]);
 
   const handleGDSSync = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,10 +163,7 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
       mockExpirationDate.setFullYear(mockExpirationDate.getFullYear() + 1);
 
       setTicket({
-        passengers: {
-          adults: 1,
-          children: 0,
-        },
+        passengers: ['Primary Passenger'],
         fareClass: 'ECONOMY',
         baseCost: 142.50,
         issueDate: mockIssueDate,
@@ -184,7 +187,7 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
     if (acceptedFiles.length > 0) {
       handlePDFUpload(acceptedFiles[0]);
     }
-  }, []);
+  }, [handlePDFUpload]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -255,7 +258,7 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
               PASSENGERS
             </div>
             <div className="text-lg font-mono text-slate-100 font-bold">
-              {ticket.passengers.adults}A {ticket.passengers.children > 0 && `${ticket.passengers.children}C`}
+              {ticket.passengers.length > 0 ? ticket.passengers.join(', ') : 'No passengers'}
             </div>
           </div>
 

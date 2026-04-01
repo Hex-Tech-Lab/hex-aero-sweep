@@ -18,6 +18,8 @@ function addDays(date: Date, days: number): Date {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
+  console.log('Incoming Params:', Object.fromEntries(searchParams));
+
   const sessionId = searchParams.get('sessionId');
   const searchWindowStart = searchParams.get('searchWindowStart');
   const searchWindowEnd = searchParams.get('searchWindowEnd');
@@ -28,6 +30,23 @@ export async function GET(request: NextRequest) {
   const baseCost = parseFloat(searchParams.get('baseCost') || '500');
   const passengers = parseInt(searchParams.get('passengers') || '1');
   const fareClass = (searchParams.get('fareClass') || 'ECONOMY').toLowerCase();
+  const passengerCount = parseInt(searchParams.get('passengers') || '1');
+
+  // Rebooking mode preferences
+  const directFlightOnly = searchParams.get('directFlightOnly') === 'true';
+  const outboundTimePreference = searchParams.get('outboundTimePreference') || 'any';
+  const inboundTimePreference = searchParams.get('inboundTimePreference') || 'any';
+
+  // Passenger breakdown for child discount verification
+  const passengerBreakdownRaw = searchParams.get('passengerBreakdown');
+  let passengerBreakdown = undefined;
+  if (passengerBreakdownRaw) {
+    try {
+      passengerBreakdown = JSON.parse(passengerBreakdownRaw);
+    } catch (e) {
+      console.warn('[API] Failed to parse passengerBreakdown:', e);
+    }
+  }
 
   const origin = searchParams.get('origin') || 'CAI';
   const destination = searchParams.get('destination') || 'ATH';
@@ -155,10 +174,16 @@ export async function GET(request: NextRequest) {
                 destination,
                 departureDate,
                 returnDate,
-                passengers,
+                passengers: passengerCount,
                 cabinClass,
                 originalTicket: originalTicketData,
                 baseCost,
+                preferences: {
+                  directFlightOnly,
+                  outboundTimePreference: outboundTimePreference as any,
+                  inboundTimePreference: inboundTimePreference as any,
+                  passengerBreakdown,
+                },
               });
 
               if (DEVELOPER_VERBOSE_MODE && candidates.length > 0) {

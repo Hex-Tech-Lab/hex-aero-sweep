@@ -102,32 +102,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const issueDate = llmResult.data.issueDate ? new Date(llmResult.data.issueDate) : new Date();
-      const expirationDate = new Date(issueDate);
-      expirationDate.setFullYear(expirationDate.getFullYear() + 1);
-
-      const passengerCount = llmResult.data.passengerCount || llmResult.data.passengers?.length || 1;
-      const lastPassengerName = llmResult.data.passengers?.[llmResult.data.passengers.length - 1] || 'PASSENGER';
-
       return NextResponse.json({
         success: true,
-        data: {
-          pnr: llmResult.data.pnr.toUpperCase(),
-          primaryPassengerLastName: llmResult.data.primaryPassengerLastName?.toUpperCase() || lastPassengerName.split(' ').pop()?.toUpperCase() || 'PASSENGER',
-          passengers: {
-            adults: passengerCount,
-            children: 0
-          },
-          fareClass: llmResult.data.fareClass || 'ECONOMY',
-          baseCost: llmResult.data.baseFare || 0,
-          issueDate: issueDate.toISOString().split('T')[0],
-          expirationDate: expirationDate.toISOString().split('T')[0],
-          rules: {
-            validity: llmResult.data.validity || 'Ticket valid for 1 year from issue',
-            luggage: llmResult.data.baggageAllowance || 'Standard allowance per fare class',
-            cancellation: llmResult.data.cancellationPolicy || 'Subject to fare rules and conditions',
-          },
-        },
+        data: llmResult.data,
         metadata: {
           modelUsed: llmResult.modelUsed,
           latencyMs: llmResult.telemetry?.latencyMs,
