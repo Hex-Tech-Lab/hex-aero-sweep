@@ -61,7 +61,7 @@ export function TerminalOutput() {
           logs.map((log) => (
             <div key={log.id} className="mb-1 flex gap-2">
               <span className="text-slate-600 shrink-0">
-                [{log.timestamp.toLocaleTimeString()}]
+                [{new Date(log.timestamp).toLocaleTimeString()}]
               </span>
               <span className={cn(logColorClass[log.level])}>
                 {log.message}

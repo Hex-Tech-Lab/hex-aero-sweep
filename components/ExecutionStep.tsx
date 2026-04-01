@@ -58,7 +58,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
       maxNights: config.maxNights,
       priceTolerance: config.priceTolerance,
       maxApiCalls: config.maxApiCalls,
-      baseCost: ticket.baseCost,
+      baseCost: ticket.baseCost || 0,
       passengers: ticket.passengers.length,
       // Rebooking mode preferences
       directFlightOnly: config.directFlightOnly,
