@@ -59,7 +59,7 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-800 bg-black/95 backdrop-blur-sm h-24">
+    <div className="fixed bottom-0 left-0 w-full z-50 border-t border-slate-800 bg-black/95 backdrop-blur-sm h-24">
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />

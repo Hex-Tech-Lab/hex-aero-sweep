@@ -551,6 +551,34 @@ export async function syncPNRDetails(pnr: string, lastName: string): Promise<Syn
   }
 }
 
+async function withConcurrencyLimit<T, R>(
+  items: T[],
+  concurrency: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  const executing: Promise<void>[] = [];
+
+  for (const item of items) {
+    const promise = processor(item).then(result => {
+      results.push(result);
+    });
+
+    executing.push(promise);
+
+    if (executing.length >= concurrency) {
+      await Promise.race(executing);
+      executing.splice(
+        executing.findIndex(p => p === promise),
+        1
+      );
+    }
+  }
+
+  await Promise.all(executing);
+  return results;
+}
+
 export async function batchedSearchDuffel<T>(
   searches: T[],
   batchSize: number,
@@ -566,8 +594,12 @@ export async function batchedSearchDuffel<T>(
 
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex];
-    const batchPromises = batch.map(param => executeSearch(param));
-    const batchResults = await Promise.all(batchPromises);
+    
+    const batchResults = await withConcurrencyLimit(batch, 3, async (param) => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return executeSearch(param);
+    });
+    
     results.push(...batchResults);
 
     if (onBatchComplete) {

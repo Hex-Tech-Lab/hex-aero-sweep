@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
-import { GlobalHeader } from '@/components/GlobalHeader';
+import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
 import { ConfigStep } from '@/components/ConfigStep';
@@ -12,6 +12,7 @@ import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const { currentStep, setCurrentStep, isTicketValid, isConfigValid } = useTicketStore();
+  const { isVisible: telemetryVisible } = useTelemetryStore();
 
   useEffect(() => {
     setIsMounted(true);
@@ -41,13 +42,10 @@ export default function Home() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950">
-      <GlobalHeader 
-        mode={currentStep === 3 ? 'execution' : 'wizard'} 
-        onBack={currentStep === 3 ? () => setCurrentStep(2) : undefined}
-      />
+  const bottomPadding = telemetryVisible ? 'pb-28' : '';
 
+  return (
+    <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
       {currentStep !== 3 && (
         <WizardNav
           steps={steps}
