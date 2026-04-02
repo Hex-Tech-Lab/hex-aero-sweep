@@ -61,7 +61,7 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200`}>
+    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col`}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
@@ -104,8 +104,8 @@ export function SystemTelemetryPanel() {
         </div>
       </div>
 
-      <div className={`h-full ${innerOverflow}`}>
-        <div ref={scrollRef} className="p-4 font-mono text-xs space-y-2">
+      <div ref={scrollRef} className={`flex-1 min-h-0 ${innerOverflow} p-4 font-mono text-xs space-y-2 overflow-y-auto`}>
+
           {logs.length === 0 ? (
             <div className="text-slate-600 text-center py-8">
               NO TELEMETRY DATA. AWAITING SYSTEM EVENTS...
@@ -165,7 +165,6 @@ export function SystemTelemetryPanel() {
               </div>
             ))
           )}
-        </div>
       </div>
     </div>
   );

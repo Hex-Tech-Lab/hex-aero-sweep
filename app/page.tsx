@@ -43,7 +43,7 @@ export default function Home() {
     }
   };
 
-  const bottomPadding = isVisible ? 'pb-28' : '';
+  const bottomPadding = isVisible ? 'pb-[25vh]' : '';
 
   return (
     <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
@@ -52,11 +52,13 @@ export default function Home() {
         onBack={() => setCurrentStep(Math.max(1, currentStep - 1))}
       />
 
-      <WizardNav
-        steps={steps}
-        currentStep={currentStep}
-        onStepClick={handleStepClick}
-      />
+      {currentStep !== 3 && (
+        <WizardNav
+          steps={steps}
+          currentStep={currentStep}
+          onStepClick={handleStepClick}
+        />
+      )}
 
       {currentStep === 1 && (
         <IntakeStep onNext={() => setCurrentStep(2)} />

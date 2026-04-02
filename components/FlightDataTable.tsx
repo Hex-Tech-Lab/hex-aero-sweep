@@ -32,6 +32,7 @@ type FlightSegment = {
 
 type FlightWithSegments = FlightResult & {
   outboundSegments?: FlightSegment[];
+  inboundSegments?: FlightSegment[];
 };
 
 const ROWS_PER_PAGE = 10;
@@ -71,7 +72,7 @@ type FlightRowProps = {
   getStatusBadge: (s: string) => React.ReactNode;
 };
 
-const MemoizedFlightRow = memo(function MemoizedFlightRow({
+  const MemoizedFlightRow = memo(function MemoizedFlightRow({
   flight,
   idx,
   isOutOfRange,
@@ -89,6 +90,9 @@ const MemoizedFlightRow = memo(function MemoizedFlightRow({
   return (
     <TableRow
       onClick={onClick}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      tabIndex={0}
+      role="button"
       className={cn(
         'cursor-pointer transition-colors border-b border-slate-800/50',
         'hover:bg-slate-800/30',
@@ -146,7 +150,6 @@ export function FlightDataTable() {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number; side: 'left' | 'right' }>({ x: 0, y: 0, side: 'left' });
   const [isPaging, setIsPaging] = useState(false);
   const pageIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -291,7 +294,8 @@ export function FlightDataTable() {
 
   const formatArrTime = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
-      const arr = flight.outboundSegments[0].arrivalTime;
+      const lastSeg = flight.outboundSegments[flight.outboundSegments.length - 1];
+      const arr = lastSeg.arrivalTime;
       return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
     }
     return '--:--';
@@ -317,15 +321,6 @@ export function FlightDataTable() {
   const handleRowClick = useCallback((flight: any) => {
     setActiveCandidateId(activeCandidateId === flight.id ? null : flight.id);
   }, [activeCandidateId]);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const threshold = window.innerWidth - 300;
-    setTooltipPosition({
-      x: e.clientX,
-      y: e.clientY,
-      side: e.clientX > threshold ? 'left' : 'right'
-    });
-  };
 
   const startPaging = useCallback((direction: 'prev' | 'next') => {
     if (pageIntervalRef.current) return;
@@ -459,7 +454,7 @@ export function FlightDataTable() {
         </span>
       </div>
 
-      <div className="overflow-x-auto max-h-[350px] relative" onMouseMove={handleMouseMove}>
+      <div className="overflow-x-auto max-h-[350px] relative">
         <Table>
           <TableHeader className="sticky top-0 bg-slate-900 z-10">
             <TableRow className="border-b border-slate-800">

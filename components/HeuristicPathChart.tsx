@@ -9,11 +9,11 @@ import { TrendingUp } from 'lucide-react';
 function groupByNights(data: { nights: number; yield: number }[]) {
   if (data.length === 0) return [];
   
-  const grouped: Record<number, { yields: number[]; prices: number[] }> = {};
+  const grouped: Record<number, { yields: number[] }> = {};
   
   data.forEach(d => {
     if (!grouped[d.nights]) {
-      grouped[d.nights] = { yields: [], prices: [] };
+      grouped[d.nights] = { yields: [] };
     }
     grouped[d.nights].yields.push(d.yield);
   });
@@ -123,7 +123,7 @@ export function HeuristicPathChart() {
                 fontSize: '9px',
               }}
               formatter={(value: any, name: string) => {
-                if (name === 'avgYield') return [`$${Number(value).toFixed(2)}`, 'Avg Yield'];
+                if (name === 'Avg Yield') return [`$${Number(value).toFixed(2)}`, 'Avg Yield'];
                 return [value, name];
               }}
               labelFormatter={(label) => `${label} Nights`}

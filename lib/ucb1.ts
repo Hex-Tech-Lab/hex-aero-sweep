@@ -41,7 +41,7 @@ export class UCB1 {
     for (const prior of priors) {
       const arm = this.arms.find(a => a.weekIndex === prior.weekIndex);
       if (arm) {
-        arm.meanReward = prior.bestYield;
+        arm.meanReward = -prior.bestYield;
         arm.visits = prior.sampleCount;
         this.totalVisits += prior.sampleCount;
       }
@@ -108,6 +108,7 @@ export class UCB1 {
 }
 
 export function chunkArray<T>(array: T[], size: number): T[][] {
+  if (size < 1) throw new Error('chunkArray: size must be >= 1');
   const chunks: T[][] = [];
   for (let i = 0; i < array.length; i += size) {
     chunks.push(array.slice(i, i + size));

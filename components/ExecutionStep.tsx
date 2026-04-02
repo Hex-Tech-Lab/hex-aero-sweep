@@ -1,5 +1,6 @@
 'use client';
 
+import type { ElementType } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { TerminalOutput } from '@/components/TerminalOutput';
@@ -8,7 +9,7 @@ import { VolatilityChart } from '@/components/VolatilityChart';
 import { HeuristicPathChart } from '@/components/HeuristicPathChart';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Activity, Target, TrendingDown, TrendingUp, XCircle, CheckCircle2 } from 'lucide-react';
+import { Activity, Target, TrendingDown, TrendingUp, XCircle, CheckCircle2, Star } from 'lucide-react';
 
 type MetricBoxProps = {
   label: string;
@@ -79,8 +80,9 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const totalScanned = metrics?.totalScanned || 0;
   const outOfRange = metrics?.outOfRange || 0;
   const estVolume = (config.maxApiCalls || 100) * 1200;
+  const bestCandidateCount = flightResults.filter(f => f.status === 'verified').length;
 
-  const bottomPadding = telemetryVisible ? 'pb-32' : 'pb-20';
+  const bottomPadding = telemetryVisible ? 'pb-[25vh]' : 'pb-20';
 
   return (
     <div className="max-w-full mx-auto px-4 py-2 space-y-2">
@@ -94,7 +96,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="API Calls"
-          value={metrics?.progress || `0/${config.maxApiCalls}`}
+          value={metrics?.progress || '0/0'}
           variant="default"
           icon={Target}
         />
@@ -117,11 +119,11 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
           icon={CheckCircle2}
         />
         <MetricBox
-          label="Best Yield"
-          value={bestYieldDisplay}
-          subValue={bestYieldIsNegative ? 'Savings available' : 'Best option found'}
-          variant={bestYieldIsNegative ? 'success' : 'warning'}
-          icon={bestYieldIsNegative ? TrendingDown : TrendingUp}
+          label="Top Matches"
+          value={bestCandidateCount}
+          subValue="Verified"
+          variant="success"
+          icon={Star}
         />
       </div>
 

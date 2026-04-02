@@ -157,6 +157,11 @@ export async function GET(request: NextRequest) {
             message: 'Duffel API key not configured. Please add DUFFEL_API_KEY to environment variables.',
           },
         });
+        try {
+          await updateSearchLog(sessionId, { status: 'aborted' });
+        } catch (dbError) {
+          console.error('Failed to update search log on abort:', dbError);
+        }
         controller.close();
         return;
       }
@@ -173,11 +178,11 @@ export async function GET(request: NextRequest) {
 
       sendLog('info', `[CONFIG] Carrier: ${originalCarrier} | Route: ${origin}-${destination} | Window: ${totalDays} days | ${weekCount} weeks`);
 
-      const phase0Budget = Math.ceil(maxApiCalls * 0.0);
-      const phase1Budget = Math.ceil(maxApiCalls * 0.30);
-      const phase2Budget = Math.ceil(maxApiCalls * 0.00);
-      const phase3Budget = Math.ceil(maxApiCalls * 0.60);
-      const phase4Budget = maxApiCalls - phase0Budget - phase1Budget - phase2Budget - phase3Budget;
+      const phase0Budget = Math.floor(maxApiCalls * 0.0);
+      const phase1Budget = Math.floor(maxApiCalls * 0.30);
+      const phase2Budget = Math.floor(maxApiCalls * 0.00);
+      const phase3Budget = Math.floor(maxApiCalls * 0.60);
+      const phase4Budget = Math.max(0, maxApiCalls - phase0Budget - phase1Budget - phase2Budget - phase3Budget);
 
       try {
         sendLog('info', `${PHASE_LABELS.SEEDING} Loading historic priors from Amadeus/Stub`);
@@ -190,7 +195,7 @@ export async function GET(request: NextRequest) {
         sendLog('success', `${PHASE_LABELS.SEEDING} Loaded ${priors.length} prior weeks (UCB1 initialized)`);
         sendMessage({
           type: 'metrics',
-          data: { phase: 'PHASE 0', armsInitialized: weekCount, priorsLoaded: priors.length },
+          data: { phase: 'PHASE 0', armsInitialized: weekCount, priorsLoaded: priors.length, totalScanned: 0, candidatesFound: 0, outOfRange: 0, progress: `0/${maxApiCalls}` },
         });
 
         sendLog('info', `${PHASE_LABELS.PROBE} Sparse probe: ${phase1Budget} calls across ${weekCount} weeks`);
@@ -276,7 +281,20 @@ export async function GET(request: NextRequest) {
 
         sendLog('success', `${PHASE_LABELS.BRACKET} Analyzing Phase 1 results`);
 
-        const top3Weeks = [...phase1Results]
+        const dedupedResults = phase1Results.reduce((acc, curr) => {
+          const existing = acc.find(r => r.weekIndex === curr.weekIndex);
+          if (!existing || curr.bestYield < existing.bestYield) {
+            if (existing) {
+              const idx = acc.indexOf(existing);
+              acc[idx] = curr;
+            } else {
+              acc.push(curr);
+            }
+          }
+          return acc;
+        }, [] as typeof phase1Results);
+
+        const top3Weeks = [...dedupedResults]
           .sort((a, b) => a.bestYield - b.bestYield)
           .slice(0, 3);
 

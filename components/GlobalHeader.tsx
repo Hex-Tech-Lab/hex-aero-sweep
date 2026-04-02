@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plane, Loader2 } from 'lucide-react';
 import { useTicketStore } from '@/src/store/useTicketStore';
@@ -58,7 +59,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
       maxNights: config.maxNights,
       priceTolerance: config.priceTolerance,
       maxApiCalls: config.maxApiCalls,
-      baseCost: (ticket as any).baseFare || ticket.baseCost || 792.87,
+      baseCost: ticket.baseCost || 792.87,
       passengers: ticket.passengers.length,
       directFlightOnly: config.directFlightOnly,
       outboundTimePreference: config.outboundTimePreference,
@@ -76,20 +77,22 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
     connect({
       ...sweepParams,
       onComplete: () => {
+        const finalMetrics = useTicketStore.getState().metrics;
         addTelemetryLog({
           source: 'DUFFEL',
           type: 'RESPONSE',
           message: 'Provider sweep completed successfully',
-          payload: { sessionId: sweepExecutionId, metrics }
+          payload: { sessionId: sweepExecutionId, metrics: finalMetrics }
         });
         toast.success('Sweep completed successfully');
       },
       onError: (error) => {
+        const finalMetrics = useTicketStore.getState().metrics;
         addTelemetryLog({
           source: 'DUFFEL',
           type: 'ERROR',
           message: `Provider sweep failed: ${error}`,
-          payload: { sessionId: sweepExecutionId, error }
+          payload: { sessionId: sweepExecutionId, error, metrics: finalMetrics }
         });
         toast.error(`Sweep failed: ${error}`);
       },
@@ -144,7 +147,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
               </div>
               <div>
                 <h1 className="text-base font-bold tracking-tight text-slate-100">
-                  AEROSWEEP <span className="text-cyan-400">v4.0</span>
+                  AEROSWEEP <span className="text-cyan-400">v7.0</span>
                 </h1>
                 <p className="text-[8px] text-slate-500 font-mono uppercase tracking-wider">
                   Aviation Pricing Intelligence
@@ -212,5 +215,3 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
     </header>
   );
 }
-
-import { useState } from 'react';

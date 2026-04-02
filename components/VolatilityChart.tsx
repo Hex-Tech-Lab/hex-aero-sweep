@@ -18,17 +18,18 @@ function binData(data: { date: string; price: number; yieldDelta: number }[], bi
     const chunk = data.slice(i, i + binSize);
     const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
     const avgYield = chunk.reduce((sum, d) => sum + d.yieldDelta, 0) / chunk.length;
-    const firstDate = chunk[0].date;
+    const midIdx = Math.floor(chunk.length / 2);
+    const midDate = chunk[midIdx].date;
     
-    let displayDate = firstDate;
+    let displayDate = midDate;
     try {
-      displayDate = format(parseISO(firstDate), 'MM-dd');
+      displayDate = format(parseISO(midDate), 'MM-dd');
     } catch {
-      displayDate = firstDate.substring(5);
+      displayDate = midDate.substring(5);
     }
     
     binned.push({
-      date: firstDate,
+      date: midDate,
       displayDate,
       price: avgPrice,
       yieldDelta: avgYield,
@@ -46,7 +47,8 @@ export function VolatilityChart() {
     if (flightResults.length === 0) return [];
 
     const sorted = [...flightResults]
-      .filter(f => f.status === 'verified' || f.status === 'live')
+      .filter(f => (f.status === 'verified' || f.status === 'live') && f.departureDate)
+      .filter(f => !isNaN(new Date(f.departureDate).getTime()))
       .sort((a, b) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime());
 
     if (sorted.length === 0) return [];

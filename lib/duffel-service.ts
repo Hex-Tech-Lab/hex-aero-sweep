@@ -569,17 +569,20 @@ async function withConcurrencyLimit<T, R>(
   concurrency: number,
   processor: (item: T) => Promise<R>
 ): Promise<R[]> {
-  const results: R[] = [];
+  const results = new Array<R>(items.length);
   const executing: Promise<void>[] = [];
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const idx = i;
+
     const p = processor(item).then(result => {
-      results.push(result);
+      results[idx] = result;
     });
 
     const e = p.finally(() => {
-      const idx = executing.indexOf(e);
-      if (idx > -1) executing.splice(idx, 1);
+      const execIdx = executing.indexOf(e);
+      if (execIdx > -1) executing.splice(execIdx, 1);
     });
     executing.push(e);
 
@@ -598,6 +601,7 @@ export async function batchedSearchDuffel<T>(
   executeSearch: (param: T) => Promise<SearchResult>,
   onBatchComplete?: (results: SearchResult[], batchIndex: number) => void
 ): Promise<SearchResult[]> {
+  if (batchSize < 1) throw new Error('batchedSearchDuffel: batchSize must be >= 1');
   const results: SearchResult[] = [];
   const batches: T[][] = [];
 
