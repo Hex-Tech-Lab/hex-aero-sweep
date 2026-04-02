@@ -119,7 +119,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
 
   return (
     <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-full mx-auto px-4 py-2">
+      <div className="w-full px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button

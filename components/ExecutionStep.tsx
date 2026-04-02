@@ -85,7 +85,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const bottomPadding = telemetryVisible ? 'mb-48' : 'mb-20';
 
   return (
-    <div className="max-w-full mx-auto px-4 py-2 space-y-2">
+    <div className="w-full px-4 py-2 space-y-2">
       <div className="grid grid-cols-7 gap-1.5">
         <MetricBox
           label="Est. Volume"
