@@ -1,0 +1,74 @@
+[
+  {
+    "weekStartDate": "2025-12-31T22:20:17.953Z",
+    "bestYield": 135,
+    "sampleCount": 8,
+    "confidence": 0.5
+  },
+  {
+    "weekStartDate": "2026-01-21T22:20:17.953Z",
+    "bestYield": 135,
+    "sampleCount": 11,
+    "confidence": 0.5
+  },
+  {
+    "weekStartDate": "2026-02-11T22:20:17.953Z",
+    "bestYield": 135,
+    "sampleCount": 9,
+    "confidence": 0.5
+  },
+  {
+    "weekStartDate": "2026-03-04T22:20:17.953Z",
+    "bestYield": 135,
+    "sampleCount": 12,
+    "confidence": 0.5
+  },
+  {
+    "weekStartDate": "2026-01-07T22:20:17.953Z",
+    "bestYield": 150,
+    "sampleCount": 9,
+    "confidence": 0.65
+  },
+  {
+    "weekStartDate": "2026-01-28T22:20:17.953Z",
+    "bestYield": 150,
+    "sampleCount": 12,
+    "confidence": 0.65
+  },
+  {
+    "weekStartDate": "2026-02-18T22:20:17.953Z",
+    "bestYield": 150,
+    "sampleCount": 10,
+    "confidence": 0.65
+  },
+  {
+    "weekStartDate": "2026-03-11T22:20:17.953Z",
+    "bestYield": 150,
+    "sampleCount": 8,
+    "confidence": 0.65
+  },
+  {
+    "weekStartDate": "2026-01-14T22:20:17.953Z",
+    "bestYield": 165,
+    "sampleCount": 10,
+    "confidence": 0.8
+  },
+  {
+    "weekStartDate": "2026-02-04T22:20:17.953Z",
+    "bestYield": 165,
+    "sampleCount": 8,
+    "confidence": 0.8
+  },
+  {
+    "weekStartDate": "2026-02-25T22:20:17.953Z",
+    "bestYield": 165,
+    "sampleCount": 11,
+    "confidence": 0.8
+  },
+  {
+    "weekStartDate": "2026-03-18T22:20:17.953Z",
+    "bestYield": 165,
+    "sampleCount": 9,
+    "confidence": 0.8
+  }
+]

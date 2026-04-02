@@ -77,6 +77,55 @@ function matchesCarrier(offerCarrier: string, originalCarrier: string): boolean 
   return offerCarrier === originalCarrier;
 }
 
+const AEGEAN_FARE_PENALTIES = {
+  LIGHT: {
+    code: 'light',
+    checkedBagPenalty: 50,
+    changeFeePenalty: 40,
+    totalPenalty: 90
+  },
+  FLEX: {
+    code: 'flex',
+    checkedBagPenalty: 0,
+    changeFeePenalty: 0,
+    totalPenalty: 0
+  },
+  FAMILY: {
+    code: 'family',
+    checkedBagPenalty: 0,
+    changeFeePenalty: 0,
+    totalPenalty: 0
+  }
+};
+
+const BOOKING_CLASS_TO_FARE: Record<string, string> = {
+  Y: 'flex',
+  B: 'flex',
+  M: 'flex',
+  H: 'flex',
+  Q: 'light',
+  V: 'light',
+  L: 'light',
+  K: 'light',
+  S: 'light',
+  T: 'light',
+  U: 'light',
+  P: 'family'
+};
+
+function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string): number {
+  const brandLower = offerFareBrand.toLowerCase();
+  if (brandLower.includes('family') || brandLower.includes('plus')) {
+    return 0;
+  }
+  if (brandLower.includes('flex') || brandLower.includes('business')) {
+    return 0;
+  }
+  const normalizedClass = offerBookingClass?.toUpperCase() || 'Y';
+  const fareType = BOOKING_CLASS_TO_FARE[normalizedClass] || 'light';
+  return AEGEAN_FARE_PENALTIES[fareType.toUpperCase() as keyof typeof AEGEAN_FARE_PENALTIES]?.totalPenalty || 90;
+}
+
 function matchesRouteTopology(
   offerSegments: any[],
   originalRoute: Array<{ from: string; to: string }>
@@ -278,10 +327,9 @@ export async function searchDuffelOffers(params: {
       const price = parseFloat(offer.total_amount);
       let yieldDelta = price - params.baseCost;
 
-      const fareBrandLower = fareBrand.toLowerCase();
-      if (fareBrandLower.includes('light') || fareBrandLower.includes('basic') || fareBrandLower.includes('economy')) {
-        yieldDelta += 100;
-      }
+      const offerBookingClass = outboundSlice.fare_brand_name || offer.cabin_class || 'Y';
+      const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass);
+      yieldDelta += farePenalty;
 
       const outboundSegments: FlightSegment[] = outboundSlice.segments.map((seg: any) => ({
         origin: seg.origin?.iata_code || '',
