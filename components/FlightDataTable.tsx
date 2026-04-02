@@ -123,8 +123,8 @@ type FlightRowProps = {
         {formatInboundTime(flight)}
       </TableCell>
       <TableCell className="text-center px-2">
-        <span className="text-[10px] font-mono text-slate-400">
-          {flight.nights}N
+        <span className="text-[10px] font-mono text-slate-400 uppercase">
+          {flight.metadata?.cabinClass || 'Eco'}
         </span>
       </TableCell>
       <TableCell className="px-2">
@@ -140,6 +140,16 @@ type FlightRowProps = {
         >
           {fb}
         </Badge>
+      </TableCell>
+      <TableCell className="text-center px-2">
+        <span className="text-[10px] font-mono text-slate-400">
+          {flight.metadata?.bookingClass || '-'}
+        </span>
+      </TableCell>
+      <TableCell className="text-center px-2">
+        <span className="text-[10px] font-mono text-slate-400">
+          {flight.nights}N
+        </span>
       </TableCell>
       <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
         ${flight.price.toFixed(2)}
@@ -553,9 +563,12 @@ export function FlightDataTable() {
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
                 In Time
               </TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Cabin</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Brand</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Class</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Nights</TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('fareBrand')}>
-                Brand<SortIcon columnKey="fareBrand" />
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
+                Price<SortIcon columnKey="price" />
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
                 Price<SortIcon columnKey="price" />
@@ -569,7 +582,7 @@ export function FlightDataTable() {
           <TableBody>
             {paginatedFlights.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={10} className="text-center text-slate-600 py-8">
+                <TableCell colSpan={12} className="text-center text-slate-600 py-8">
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">
@@ -660,7 +673,7 @@ export function FlightDataTable() {
       )}
 
       <Sheet open={!!selectedFlight} onOpenChange={() => setActiveCandidateId(null)}>
-        <SheetContent className="fixed right-0 top-0 h-full w-[800px] shadow-2xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto">
+        <SheetContent className="fixed right-0 top-0 h-full w-[1200px] shadow-2xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto">
           {selectedFlight && (
             <>
               <div className="pb-4 border-b border-slate-800">

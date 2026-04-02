@@ -25,6 +25,7 @@ export interface FlightCandidate {
   metadata: {
     phase: string;
     segments: number;
+    cabinClass: string;
     bookingClass: string;
     fareBrand?: string;
     layoverDuration?: string;
@@ -275,7 +276,12 @@ export async function searchDuffelOffers(params: {
       }
 
       const price = parseFloat(offer.total_amount);
-      const yieldDelta = price - params.baseCost;
+      let yieldDelta = price - params.baseCost;
+
+      const fareBrandLower = fareBrand.toLowerCase();
+      if (fareBrandLower.includes('light') || fareBrandLower.includes('basic') || fareBrandLower.includes('economy')) {
+        yieldDelta += 100;
+      }
 
       const outboundSegments: FlightSegment[] = outboundSlice.segments.map((seg: any) => ({
         origin: seg.origin?.iata_code || '',
@@ -327,6 +333,7 @@ export async function searchDuffelOffers(params: {
         metadata: {
           phase: 'LIVE DUFFEL',
           segments: outboundSlice.segments.length,
+          cabinClass: offer.cabin_class || 'economy',
           bookingClass: outboundSlice.fare_brand_name || offer.cabin_class || 'Y',
           fareBrand,
           timePreferences: {
