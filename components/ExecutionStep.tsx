@@ -75,7 +75,9 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
     : '-';
   const bestYieldIsNegative = flightResults.length > 0 && bestYield < 0;
 
-  const validCandidates = metrics.candidatesFound;
+  const validCandidates = metrics?.candidatesFound || 0;
+  const totalScanned = metrics?.totalScanned || 0;
+  const outOfRange = metrics?.outOfRange || 0;
   const estVolume = (config.maxApiCalls || 100) * 1200;
 
   const bottomPadding = telemetryVisible ? 'pb-32' : 'pb-20';
@@ -92,19 +94,19 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="API Calls"
-          value={metrics.progress || `0/${config.maxApiCalls}`}
+          value={metrics?.progress || `0/${config.maxApiCalls}`}
           variant="default"
           icon={Target}
         />
         <MetricBox
           label="Total Scanned"
-          value={metrics.totalScanned.toLocaleString()}
+          value={totalScanned.toLocaleString()}
           variant="default"
           icon={Activity}
         />
         <MetricBox
           label="Out of Range"
-          value={metrics.outOfRange.toLocaleString()}
+          value={outOfRange.toLocaleString()}
           variant="error"
           icon={XCircle}
         />

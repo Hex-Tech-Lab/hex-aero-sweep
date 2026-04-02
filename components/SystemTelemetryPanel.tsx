@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useTelemetryStore, LogType } from '@/src/store/useTelemetryStore';
 import { ChevronDown, ChevronUp, Trash2, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function SystemTelemetryPanel() {
   const { logs, isVisible, toggleVisibility, clearLogs } = useTelemetryStore();
@@ -18,6 +17,9 @@ export function SystemTelemetryPanel() {
   }, [logs]);
 
   if (!isVisible) return null;
+
+  const panelHeight = isExpanded ? 'h-[25vh]' : 'h-12';
+  const innerOverflow = isExpanded ? 'overflow-y-auto' : '';
 
   const getLogColor = (type: LogType): string => {
     switch (type) {
@@ -59,8 +61,8 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 w-full z-50 border-t border-slate-800 bg-black/95 backdrop-blur-sm h-24">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950">
+    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200`}>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
           <span className="text-xs font-mono text-cyan-400 font-semibold">
@@ -102,71 +104,69 @@ export function SystemTelemetryPanel() {
         </div>
       </div>
 
-      {isExpanded && (
-        <ScrollArea className="h-96 w-full">
-          <div ref={scrollRef} className="p-4 font-mono text-xs space-y-2">
-            {logs.length === 0 ? (
-              <div className="text-slate-600 text-center py-8">
-                NO TELEMETRY DATA. AWAITING SYSTEM EVENTS...
-              </div>
-            ) : (
-              logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="border border-slate-800 rounded bg-slate-950/50 p-3 space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-slate-600">
-                        {formatTimestamp(log.timestamp)}
+      <div className={`h-full ${innerOverflow}`}>
+        <div ref={scrollRef} className="p-4 font-mono text-xs space-y-2">
+          {logs.length === 0 ? (
+            <div className="text-slate-600 text-center py-8">
+              NO TELEMETRY DATA. AWAITING SYSTEM EVENTS...
+            </div>
+          ) : (
+            logs.map((log) => (
+              <div
+                key={log.id}
+                className="border border-slate-800 rounded bg-slate-950/50 p-3 space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate-600">
+                      {formatTimestamp(log.timestamp)}
+                    </span>
+                    <span className={`font-semibold ${getSourceColor(log.source)}`}>
+                      [{log.source}]
+                    </span>
+                    <span className={`font-semibold ${getLogColor(log.type)}`}>
+                      {log.type}
+                    </span>
+                    {log.latency && (
+                      <span className="text-amber-400">
+                        {log.latency}ms
                       </span>
-                      <span className={`font-semibold ${getSourceColor(log.source)}`}>
-                        [{log.source}]
-                      </span>
-                      <span className={`font-semibold ${getLogColor(log.type)}`}>
-                        {log.type}
-                      </span>
-                      {log.latency && (
-                        <span className="text-amber-400">
-                          {log.latency}ms
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
-
-                  {log.message && (
-                    <div className="text-slate-300 pl-2 border-l-2 border-slate-700">
-                      {log.message}
-                    </div>
-                  )}
-
-                  {log.rawResponse && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-yellow-400 hover:text-yellow-300">
-                        RAW RESPONSE ▼
-                      </summary>
-                      <pre className="mt-2 p-2 bg-black border border-slate-800 rounded text-slate-400 overflow-x-auto text-[10px]">
-                        {log.rawResponse}
-                      </pre>
-                    </details>
-                  )}
-
-                  {log.payload && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-cyan-400 hover:text-cyan-300">
-                        PAYLOAD ▼
-                      </summary>
-                      <pre className="mt-2 p-2 bg-black border border-slate-800 rounded text-slate-400 overflow-x-auto text-[10px]">
-                        {JSON.stringify(log.payload, null, 2)}
-                      </pre>
-                    </details>
-                  )}
                 </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-      )}
+
+                {log.message && (
+                  <div className="text-slate-300 pl-2 border-l-2 border-slate-700">
+                    {log.message}
+                  </div>
+                )}
+
+                {log.rawResponse && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-yellow-400 hover:text-yellow-300">
+                      RAW RESPONSE ▼
+                    </summary>
+                    <pre className="mt-2 p-2 bg-black border border-slate-800 rounded text-slate-400 overflow-x-auto text-[10px]">
+                      {log.rawResponse}
+                    </pre>
+                  </details>
+                )}
+
+                {log.payload && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-cyan-400 hover:text-cyan-300">
+                      PAYLOAD ▼
+                    </summary>
+                    <pre className="mt-2 p-2 bg-black border border-slate-800 rounded text-slate-400 overflow-x-auto text-[10px]">
+                      {JSON.stringify(log.payload, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
