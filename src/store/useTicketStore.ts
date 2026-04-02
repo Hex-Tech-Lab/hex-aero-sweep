@@ -131,7 +131,7 @@ const initialMetrics: ExecutionMetrics = {
 
 const MAX_LOGS = 500;
 
-export const useTicketStore = create<TicketStore, [["zustand/persist", TicketStore]]>(
+export const useTicketStore = create<TicketStore>()(
   persist(
     (set, get) => ({
   ticket: initialTicket,

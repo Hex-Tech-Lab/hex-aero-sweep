@@ -27,7 +27,7 @@ interface TelemetryState {
   toggleExpanded: () => void;
 }
 
-export const useTelemetryStore = create<TelemetryState>((set) => ({
+export const useTelemetryStore = create<TelemetryState>()((set) => ({
   logs: [],
   isVisible: true,
   isExpanded: false,
