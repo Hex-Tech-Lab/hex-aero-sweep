@@ -62,12 +62,13 @@ type FlightRowProps = {
   idx: number;
   isOutOfRange: boolean;
   isActive: boolean;
+  isTopMatch: boolean;
   onClick: () => void;
   fareBrand: (f: any) => string;
-  formatDepTime: (f: any) => string;
-  formatArrTime: (f: any) => string;
-  formatReturnDepTime: (f: any) => string;
-  formatReturnArrTime: (f: any) => string;
+  formatOutboundDate: (f: any) => string;
+  formatOutboundTime: (f: any) => string;
+  formatInboundDate: (f: any) => string;
+  formatInboundTime: (f: any) => string;
   getStatusColor: (d: number) => string;
   getStatusBadge: (s: string) => React.ReactNode;
 };
@@ -77,12 +78,13 @@ type FlightRowProps = {
   idx,
   isOutOfRange,
   isActive,
+  isTopMatch,
   onClick,
   fareBrand,
-  formatDepTime,
-  formatArrTime,
-  formatReturnDepTime,
-  formatReturnArrTime,
+  formatOutboundDate,
+  formatOutboundTime,
+  formatInboundDate,
+  formatInboundTime,
   getStatusColor,
   getStatusBadge,
 }: FlightRowProps) {
@@ -98,17 +100,24 @@ type FlightRowProps = {
         'hover:bg-slate-800/30',
         idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60',
         isOutOfRange && 'opacity-60',
-        isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400'
+        isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400',
+        isTopMatch && 'bg-amber-900/20 border-l-2 border-amber-500'
       )}
     >
       <TableCell className={cn('font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
         {flight.carrier}
       </TableCell>
       <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-        {formatDepTime(flight)}→{formatArrTime(flight)}
+        {formatOutboundDate(flight)}
       </TableCell>
       <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-        {formatReturnDepTime(flight)}→{formatReturnArrTime(flight)}
+        {formatOutboundTime(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatInboundDate(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatInboundTime(flight)}
       </TableCell>
       <TableCell className="text-center px-2">
         <span className="text-[10px] font-mono text-slate-400">
@@ -285,38 +294,46 @@ export function FlightDataTable() {
     return 'N/A';
   }, []);
 
-  const formatDepTime = useCallback((flight: any) => {
+  const formatOutboundDate = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const dep = flight.outboundSegments[0].departureTime;
-      return dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      return dep ? new Date(dep).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '--';
     }
-    return '--:--';
+    return '--';
   }, []);
 
-  const formatArrTime = useCallback((flight: any) => {
+  const formatOutboundTime = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
-      const lastSeg = flight.outboundSegments[flight.outboundSegments.length - 1];
-      const arr = lastSeg.arrivalTime;
-      return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const first = flight.outboundSegments[0];
+      const last = flight.outboundSegments[flight.outboundSegments.length - 1];
+      const dep = first.departureTime;
+      const arr = last.arrivalTime;
+      const depTime = dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const arrTime = arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      return `${depTime}→${arrTime}`;
     }
-    return '--:--';
+    return '--:--→--:--';
   }, []);
 
-  const formatReturnDepTime = useCallback((flight: any) => {
+  const formatInboundDate = useCallback((flight: any) => {
     const dep = flight.inboundSegments?.[0]?.departureTime;
     if (dep) {
-      return new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return new Date(dep).toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
-    return '--:--';
+    return '--';
   }, []);
 
-  const formatReturnArrTime = useCallback((flight: any) => {
+  const formatInboundTime = useCallback((flight: any) => {
     if (flight.inboundSegments?.length > 0) {
-      const lastSeg = flight.inboundSegments[flight.inboundSegments.length - 1];
-      const arr = lastSeg.arrivalTime;
-      return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const first = flight.inboundSegments[0];
+      const last = flight.inboundSegments[flight.inboundSegments.length - 1];
+      const dep = first.departureTime;
+      const arr = last.arrivalTime;
+      const depTime = dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const arrTime = arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      return `${depTime}→${arrTime}`;
     }
-    return '--:--';
+    return '--:--→--:--';
   }, []);
 
   const handleRowClick = useCallback((flight: any) => {
@@ -355,6 +372,13 @@ export function FlightDataTable() {
   const selectedFlight = useMemo(() => {
     return flightResults.find(f => f.id === activeCandidateId) || null;
   }, [flightResults, activeCandidateId]);
+
+  const topMatchIds = useMemo(() => {
+    const verifiedFlights = flightResults.filter(f => f.status === 'verified');
+    const sorted = [...verifiedFlights].sort((a, b) => a.price - b.price);
+    const top3 = sorted.slice(0, 3);
+    return new Set(top3.map(f => f.id));
+  }, [flightResults]);
 
   const ComparisonTable = ({ offer }: { offer: any }) => {
     const original = ticket;
@@ -466,10 +490,16 @@ export function FlightDataTable() {
                 Carrier<SortIcon columnKey="carrier" />
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
-                Outbound DEP→ARR
+                Out Date
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
-                Inbound DEP→ARR
+                Out Time
+              </TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                In Date
+              </TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                In Time
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Nights</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('fareBrand')}>
@@ -487,7 +517,7 @@ export function FlightDataTable() {
           <TableBody>
             {paginatedFlights.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={8} className="text-center text-slate-600 py-8">
+                <TableCell colSpan={10} className="text-center text-slate-600 py-8">
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">
@@ -500,6 +530,7 @@ export function FlightDataTable() {
               paginatedFlights.map((flight, idx) => {
                 const isOutOfRange = flight.status === 'out_of_range';
                 const isActive = activeCandidateId === flight.id;
+                const isTopMatch = topMatchIds.has(flight.id);
                 return (
                   <MemoizedFlightRow
                     key={flight.id}
@@ -507,12 +538,13 @@ export function FlightDataTable() {
                     idx={idx}
                     isOutOfRange={isOutOfRange}
                     isActive={isActive}
+                    isTopMatch={isTopMatch}
                     onClick={() => handleRowClick(flight)}
                     fareBrand={fareBrand}
-                    formatDepTime={formatDepTime}
-                    formatArrTime={formatArrTime}
-                    formatReturnDepTime={formatReturnDepTime}
-                    formatReturnArrTime={formatReturnArrTime}
+                    formatOutboundDate={formatOutboundDate}
+                    formatOutboundTime={formatOutboundTime}
+                    formatInboundDate={formatInboundDate}
+                    formatInboundTime={formatInboundTime}
                     getStatusColor={getStatusColor}
                     getStatusBadge={getStatusBadge}
                   />
@@ -615,7 +647,7 @@ export function FlightDataTable() {
                   <div className="flex items-center gap-2">
                     <div className="text-center">
                       <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatDepTime(selectedFlight)}
+                        {formatOutboundTime(selectedFlight).split('→')[0]}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'}
@@ -626,7 +658,7 @@ export function FlightDataTable() {
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatArrTime(selectedFlight)}
+                        {formatOutboundTime(selectedFlight).split('→')[1]}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
@@ -634,7 +666,7 @@ export function FlightDataTable() {
                     </div>
                   </div>
                   <p className="text-center text-xs text-slate-400 mt-2">
-                    {selectedFlight.departureDate}
+                    {formatOutboundDate(selectedFlight)}
                   </p>
                 </div>
 

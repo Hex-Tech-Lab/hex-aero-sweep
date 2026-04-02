@@ -60,7 +60,7 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col ${!isExpanded ? 'overflow-hidden' : ''}`}>
+    <div className={`fixed bottom-0 left-0 w-full mb-0 pb-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col ${!isExpanded ? 'overflow-hidden' : ''}`}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
