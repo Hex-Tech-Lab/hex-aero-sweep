@@ -67,26 +67,22 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const { metrics, config, flightResults } = useTicketStore();
   const { isVisible: telemetryVisible } = useTelemetryStore();
 
-  const bestYield = flightResults.length > 0
-    ? Math.min(...flightResults.map(f => f.yieldDelta))
-    : 0;
-  
-  const bestYieldDisplay = flightResults.length > 0
-    ? (bestYield < 0 ? `-$${Math.abs(bestYield).toFixed(2)}` : `+$${bestYield.toFixed(2)}`)
-    : '-';
-  const bestYieldIsNegative = flightResults.length > 0 && bestYield < 0;
-
   const validCandidates = metrics?.candidatesFound || 0;
   const totalScanned = metrics?.totalScanned || 0;
   const outOfRange = metrics?.outOfRange || 0;
   const estVolume = (config.maxApiCalls || 100) * 1200;
-  const bestCandidateCount = flightResults.filter(f => f.status === 'verified').length;
+  const bestCandidateCount = flightResults.length > 0 ? Math.min(flightResults.length, 3) : 0;
+  const bestYield = flightResults.length > 0 ? Math.min(...flightResults.map(f => f.yieldDelta)) : '-';
+  const bestYieldDisplay = flightResults.length > 0 && typeof bestYield === 'number'
+    ? (bestYield < 0 ? `-$${Math.abs(bestYield).toFixed(2)}` : `+$${bestYield.toFixed(2)}`)
+    : '-';
+  const bestYieldIsNegative = flightResults.length > 0 && typeof bestYield === 'number' && bestYield < 0;
 
-  const bottomPadding = telemetryVisible ? 'pb-[25vh]' : 'pb-20';
+  const bottomPadding = telemetryVisible ? 'pb-48' : 'pb-20';
 
   return (
     <div className="max-w-full mx-auto px-4 py-2 space-y-2">
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-7 gap-1.5">
         <MetricBox
           label="Est. Volume"
           value={estVolume.toLocaleString()}
@@ -124,6 +120,13 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
           subValue="Verified"
           variant="success"
           icon={Star}
+        />
+        <MetricBox
+          label="Best Yield"
+          value={bestYieldDisplay}
+          subValue={bestYieldIsNegative ? 'Savings available' : 'Best option found'}
+          variant={bestYieldIsNegative ? 'success' : 'warning'}
+          icon={bestYieldIsNegative ? TrendingDown : TrendingUp}
         />
       </div>
 

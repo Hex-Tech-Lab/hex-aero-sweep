@@ -43,7 +43,7 @@ export default function Home() {
     }
   };
 
-  const bottomPadding = isVisible ? 'pb-[25vh]' : '';
+  const bottomPadding = isVisible ? 'pb-48' : '';
 
   return (
     <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
