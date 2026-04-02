@@ -82,7 +82,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
     return { count: bestCount, yieldVal: yieldNum, display, isNegative: yieldNum !== null && yieldNum < 0 };
   }, [flightResults]);
 
-  const bottomPadding = telemetryVisible ? 'pb-48' : 'pb-20';
+  const bottomPadding = telemetryVisible ? 'mb-48' : 'mb-20';
 
   return (
     <div className="max-w-full mx-auto px-4 py-2 space-y-2">
@@ -142,9 +142,6 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
       <FlightDataTable />
 
       <div className={bottomPadding}>
-        <h3 className="text-[9px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-          Terminal Output
-        </h3>
         <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden">
           <TerminalOutput />
         </div>

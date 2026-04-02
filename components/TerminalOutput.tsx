@@ -36,7 +36,7 @@ export function TerminalOutput() {
           <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
           <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
           <span className="text-[9px] text-slate-600 uppercase tracking-wide font-medium">
-            Output
+            Terminal Output
           </span>
         </div>
         <div className="flex items-center gap-1.5">
