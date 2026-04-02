@@ -159,7 +159,6 @@ export function FlightDataTable() {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
-  const [isPaging, setIsPaging] = useState(false);
   const pageIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const filteredAndSortedFlights = useMemo(() => {
@@ -337,8 +336,8 @@ export function FlightDataTable() {
   }, []);
 
   const handleRowClick = useCallback((flight: any) => {
-    setActiveCandidateId(activeCandidateId === flight.id ? null : flight.id);
-  }, [activeCandidateId]);
+    setActiveCandidateId(prev => prev === flight.id ? null : flight.id);
+  }, []);
 
   const startPaging = useCallback((direction: 'prev' | 'next') => {
     if (pageIntervalRef.current) return;
