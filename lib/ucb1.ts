@@ -49,19 +49,20 @@ export class UCB1 {
   }
 
   select(c: number = this.explorationConstant): UCB1Arm {
-    if (this.totalVisits === 0) {
-      const randomIndex = Math.floor(Math.random() * this.arms.length);
-      return this.arms[randomIndex];
+    for (const arm of this.arms) {
+      if (arm.visits === 0) {
+        return arm;
+      }
     }
 
     let bestArm: UCB1Arm | null = null;
-    let bestUCB = -Infinity;
+    let bestUCB = Infinity;
 
     for (const arm of this.arms) {
-      const explorationBonus = c * Math.sqrt(Math.log(this.totalVisits) / (arm.visits + 1));
-      const ucb = arm.meanReward + explorationBonus;
+      const explorationBonus = c * Math.sqrt(Math.log(this.totalVisits) / arm.visits);
+      const ucb = arm.meanReward - explorationBonus;
 
-      if (ucb > bestUCB) {
+      if (ucb < bestUCB) {
         bestUCB = ucb;
         bestArm = arm;
       }
@@ -83,14 +84,14 @@ export class UCB1 {
   getArmStats(): { weekIndex: number; weekStartDate: Date; meanReward: number; visits: number; ucb: number }[] {
     return this.arms.map(arm => {
       const explorationBonus = this.explorationConstant * Math.sqrt(
-        Math.log(this.totalVisits || 1) / (arm.visits + 1)
+        Math.log(this.totalVisits || 1) / (arm.visits || 1)
       );
       return {
         weekIndex: arm.weekIndex,
         weekStartDate: arm.weekStartDate,
         meanReward: arm.meanReward,
         visits: arm.visits,
-        ucb: arm.meanReward + explorationBonus,
+        ucb: arm.meanReward - explorationBonus,
       };
     });
   }

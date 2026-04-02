@@ -47,8 +47,7 @@ export function VolatilityChart() {
 
     const sorted = [...flightResults]
       .filter(f => f.status === 'verified' || f.status === 'live')
-      .sort((a, b) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime())
-      .slice(0, 500);
+      .sort((a, b) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime());
 
     if (sorted.length === 0) return [];
 

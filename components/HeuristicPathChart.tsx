@@ -35,9 +35,8 @@ export function HeuristicPathChart() {
   const chartData = useMemo(() => {
     if (flightResults.length === 0) return [];
 
-    const sliced = flightResults.slice(0, 500);
     return groupByNights(
-      sliced.map(f => ({ nights: f.nights, yield: f.yieldDelta }))
+      flightResults.map(f => ({ nights: f.nights, yield: f.yieldDelta }))
     );
   }, [flightResults]);
 

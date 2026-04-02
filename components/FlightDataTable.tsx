@@ -491,7 +491,7 @@ export function FlightDataTable() {
           <TableBody>
             {paginatedFlights.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={11} className="text-center text-slate-600 py-8">
+                <TableCell colSpan={8} className="text-center text-slate-600 py-8">
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">

@@ -258,6 +258,14 @@ export async function GET(request: NextRequest) {
 
           } catch (searchError) {
             sendLog('warning', `[ERROR] ${departureDate}: ${searchError instanceof Error ? searchError.message : 'Unknown'}`);
+            const penaltyReward: WeeklyRewardData = {
+              weekIndex: selectedArm.weekIndex,
+              weekStartDate: probeDate,
+              reward: 9999,
+              sampleCount: 1,
+            };
+            ucb1.update(selectedArm.weekIndex, penaltyReward);
+            phase1Results.push({ weekIndex: selectedArm.weekIndex, bestYield: 9999, sampleCount: 1 });
           }
 
           sendMetrics('PHASE 1');
@@ -387,6 +395,7 @@ export async function GET(request: NextRequest) {
             });
 
             totalScanned += searchResult.rawOffersCount;
+            outOfRange += searchResult.rejectedCount;
 
             for (const candidate of searchResult.candidates) {
               if (candidate.status === 'verified') {

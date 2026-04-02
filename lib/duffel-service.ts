@@ -415,6 +415,16 @@ export interface HistoricPriorsResult {
   confidence: number;
 }
 
+function simpleHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
 function getHistoricPriors(
   origin: string,
   dest: string,
@@ -436,7 +446,10 @@ function getHistoricPriors(
     const isMidWeek = midWeekBias.includes(dayOfWeek);
     const isAvoidDay = avoidDays.includes(dayOfWeek);
 
-    const baseYield = 150 + Math.random() * 100;
+    const hashInput = `${origin}${dest}${weekStart.toISOString()}`;
+    const hashValue = simpleHash(hashInput);
+    const baseYield = 150 + (hashValue % 100);
+
     const yieldBonus = isMidWeek ? -50 : 0;
     const yieldPenalty = isAvoidDay ? 40 : 0;
 

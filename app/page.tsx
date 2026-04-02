@@ -12,7 +12,7 @@ import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const { currentStep, setCurrentStep, isTicketValid, isConfigValid } = useTicketStore();
-  const { isVisible: telemetryVisible } = useTelemetryStore();
+  const isVisible = useTelemetryStore(state => state.isVisible);
 
   useEffect(() => {
     setIsMounted(true);
@@ -42,7 +42,7 @@ export default function Home() {
     }
   };
 
-  const bottomPadding = telemetryVisible ? 'pb-28' : '';
+  const bottomPadding = isVisible ? 'pb-28' : '';
 
   return (
     <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
