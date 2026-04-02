@@ -13,7 +13,8 @@ import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const { currentStep, setCurrentStep, isTicketValid, isConfigValid } = useTicketStore();
-  const { isVisible, isExpanded } = useTelemetryStore(state => ({ isVisible: state.isVisible, isExpanded: state.isExpanded }));
+  const isVisible = useTelemetryStore(state => state.isVisible);
+  const isExpanded = useTelemetryStore(state => state.isExpanded);
 
   useEffect(() => {
     setIsMounted(true);

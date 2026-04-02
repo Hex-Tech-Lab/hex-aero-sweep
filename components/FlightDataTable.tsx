@@ -92,7 +92,10 @@ type FlightRowProps = {
   return (
     <TableRow
       onClick={onClick}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onClick();
+        if (e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
       tabIndex={0}
       role="button"
       className={cn(
@@ -326,7 +329,12 @@ export function FlightDataTable() {
   const formatOutboundDate = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const dep = flight.outboundSegments[0].departureTime;
-      return dep ? new Date(dep).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '--';
+      if (dep && typeof dep === 'string') {
+        const [year, month, day] = dep.split('T')[0].split('-');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${monthNames[parseInt(month) - 1]} ${parseInt(day)}`;
+      }
+      return '--';
     }
     return '--';
   }, []);
@@ -346,8 +354,10 @@ export function FlightDataTable() {
 
   const formatInboundDate = useCallback((flight: any) => {
     const dep = flight.inboundSegments?.[0]?.departureTime;
-    if (dep) {
-      return new Date(dep).toLocaleDateString([], { month: 'short', day: 'numeric' });
+    if (dep && typeof dep === 'string') {
+      const [year, month, day] = dep.split('T')[0].split('-');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${monthNames[parseInt(month) - 1]} ${parseInt(day)}`;
     }
     return '--';
   }, []);
