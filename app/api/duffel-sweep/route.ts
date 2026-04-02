@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
 
         const priors = getHistoricPriors(origin, destination, startDate, endDate);
 
-        const ucb1 = new UCB1(weekCount, weekStarts, 1.5);
+        const ucb1 = new UCB1(weekStarts, 1.5);
         ucb1.seedWithPriors(priors);
 
         sendLog('success', `${PHASE_LABELS.SEEDING} Loaded ${priors.length} prior weeks (UCB1 initialized)`);
@@ -266,11 +266,11 @@ export async function GET(request: NextRequest) {
             const penaltyReward: WeeklyRewardData = {
               weekIndex: selectedArm.weekIndex,
               weekStartDate: probeDate,
-              reward: 9999,
+              reward: 500,
               sampleCount: 1,
             };
             ucb1.update(selectedArm.weekIndex, penaltyReward);
-            phase1Results.push({ weekIndex: selectedArm.weekIndex, bestYield: 9999, sampleCount: 1 });
+            phase1Results.push({ weekIndex: selectedArm.weekIndex, bestYield: 500, sampleCount: 1 });
           }
 
           sendMetrics('PHASE 1');

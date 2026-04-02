@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTelemetryStore, LogType } from '@/src/store/useTelemetryStore';
 import { ChevronDown, ChevronUp, Trash2, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function SystemTelemetryPanel() {
-  const { logs, isVisible, toggleVisibility, clearLogs } = useTelemetryStore();
+  const { logs, isVisible, isExpanded, toggleVisibility, clearLogs, toggleExpanded } = useTelemetryStore();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -61,7 +60,7 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col`}>
+    <div className={`fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col ${!isExpanded ? 'overflow-hidden' : ''}`}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
@@ -84,7 +83,7 @@ export function SystemTelemetryPanel() {
             CLEAR
           </Button>
           <Button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={toggleExpanded}
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs font-mono text-slate-400 hover:text-slate-300 hover:bg-slate-900"

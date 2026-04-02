@@ -70,14 +70,17 @@ export function HeuristicPathChart() {
           <div className="flex items-center gap-1 text-[8px]">
             <div className="flex items-center gap-0.5">
               <div className="w-1 h-1 rounded-full bg-emerald-400" />
+              <span className="sr-only">Positive</span>
               <span className="text-slate-500">{stats.positive}</span>
             </div>
             <div className="flex items-center gap-0.5">
               <div className="w-1 h-1 rounded-full bg-slate-400" />
+              <span className="sr-only">Neutral</span>
               <span className="text-slate-500">{stats.neutral}</span>
             </div>
             <div className="flex items-center gap-0.5">
               <div className="w-1 h-1 rounded-full bg-red-400" />
+              <span className="sr-only">Negative</span>
               <span className="text-slate-500">{stats.negative}</span>
             </div>
           </div>
@@ -112,7 +115,7 @@ export function HeuristicPathChart() {
               stroke="#475569"
               style={{ fontSize: '8px' }}
               domain={['auto', 'auto']}
-              tickFormatter={(val) => `$${val.toFixed(0)}`}
+              tickFormatter={(val) => val < 0 ? `-$${Math.abs(val).toFixed(0)}` : `$${val.toFixed(0)}`}
             />
             <ReferenceLine y={0} stroke="#475569" strokeDasharray="2 2" strokeWidth={1} />
             <Tooltip
@@ -123,7 +126,10 @@ export function HeuristicPathChart() {
                 fontSize: '9px',
               }}
               formatter={(value: any, name: string) => {
-                if (name === 'Avg Yield') return [`$${Number(value).toFixed(2)}`, 'Avg Yield'];
+                if (name === 'Avg Yield') {
+                  const num = Number(value);
+                  return [num < 0 ? `-$${Math.abs(num).toFixed(2)}` : `$${num.toFixed(2)}`, 'Avg Yield'];
+                }
                 return [value, name];
               }}
               labelFormatter={(label) => `${label} Nights`}

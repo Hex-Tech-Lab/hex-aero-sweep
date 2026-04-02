@@ -31,8 +31,8 @@ type FlightSegment = {
 };
 
 type FlightWithSegments = FlightResult & {
-  outboundSegments?: FlightSegment[];
-  inboundSegments?: FlightSegment[];
+  outboundSegments: FlightSegment[];
+  inboundSegments: FlightSegment[];
 };
 
 const ROWS_PER_PAGE = 10;
@@ -90,7 +90,7 @@ type FlightRowProps = {
   return (
     <TableRow
       onClick={onClick}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
       tabIndex={0}
       role="button"
       className={cn(
@@ -279,7 +279,8 @@ export function FlightDataTable() {
   const formatRoute = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const first = flight.outboundSegments[0];
-      return `${first.origin} → ${first.destination}`;
+      const last = flight.outboundSegments[flight.outboundSegments.length - 1];
+      return `${first.origin} → ${last.destination}`;
     }
     return 'N/A';
   }, []);

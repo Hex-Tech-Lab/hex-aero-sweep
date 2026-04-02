@@ -25,7 +25,7 @@ export class UCB1 {
   private totalVisits: number;
   private explorationConstant: number;
 
-  constructor(weekCount: number, weekStarts: Date[], explorationConstant: number = 2.0) {
+  constructor(weekStarts: Date[], explorationConstant: number = 2.0) {
     this.arms = weekStarts.map((weekStart, index) => ({
       id: index,
       meanReward: 0,

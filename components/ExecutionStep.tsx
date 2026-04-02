@@ -16,7 +16,7 @@ type MetricBoxProps = {
   value: string | number;
   subValue?: string;
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
-  icon?: React.ElementType;
+  icon?: ElementType;
   className?: string;
 };
 
@@ -67,16 +67,17 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const { metrics, config, flightResults } = useTicketStore();
   const { isVisible: telemetryVisible } = useTelemetryStore();
 
+  const verifiedResults = flightResults.filter(f => f.status === 'verified');
   const validCandidates = metrics?.candidatesFound || 0;
   const totalScanned = metrics?.totalScanned || 0;
   const outOfRange = metrics?.outOfRange || 0;
   const estVolume = (config.maxApiCalls || 100) * 1200;
-  const bestCandidateCount = flightResults.length > 0 ? Math.min(flightResults.length, 3) : 0;
-  const bestYield = flightResults.length > 0 ? Math.min(...flightResults.map(f => f.yieldDelta)) : '-';
-  const bestYieldDisplay = flightResults.length > 0 && typeof bestYield === 'number'
+  const bestCandidateCount = verifiedResults.length > 0 ? Math.min(verifiedResults.length, 3) : 0;
+  const bestYield = verifiedResults.length > 0 ? Math.min(...verifiedResults.map(f => f.yieldDelta)) : '-';
+  const bestYieldDisplay = verifiedResults.length > 0 && typeof bestYield === 'number'
     ? (bestYield < 0 ? `-$${Math.abs(bestYield).toFixed(2)}` : `+$${bestYield.toFixed(2)}`)
     : '-';
-  const bestYieldIsNegative = flightResults.length > 0 && typeof bestYield === 'number' && bestYield < 0;
+  const bestYieldIsNegative = verifiedResults.length > 0 && typeof bestYield === 'number' && bestYield < 0;
 
   const bottomPadding = telemetryVisible ? 'pb-48' : 'pb-20';
 
