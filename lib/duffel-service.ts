@@ -560,18 +560,18 @@ async function withConcurrencyLimit<T, R>(
   const executing: Promise<void>[] = [];
 
   for (const item of items) {
-    const promise = processor(item).then(result => {
+    const p = processor(item).then(result => {
       results.push(result);
     });
 
-    executing.push(promise);
+    const e = p.finally(() => {
+      const idx = executing.indexOf(e);
+      if (idx > -1) executing.splice(idx, 1);
+    });
+    executing.push(e);
 
     if (executing.length >= concurrency) {
       await Promise.race(executing);
-      executing.splice(
-        executing.findIndex(p => p === promise),
-        1
-      );
     }
   }
 

@@ -13,6 +13,13 @@ export interface WeeklyYieldData {
   sampleCount: number;
 }
 
+export interface WeeklyRewardData {
+  weekIndex: number;
+  weekStartDate: Date;
+  reward: number;
+  sampleCount: number;
+}
+
 export class UCB1 {
   private arms: UCB1Arm[];
   private totalVisits: number;
@@ -63,14 +70,14 @@ export class UCB1 {
     return bestArm || this.arms[0];
   }
 
-  update(armIndex: number, yieldData: WeeklyYieldData): void {
+  update(armIndex: number, rewardData: WeeklyRewardData): void {
     const arm = this.arms[armIndex];
     if (!arm) return;
 
-    const newVisits = arm.visits + yieldData.sampleCount;
-    arm.meanReward = (arm.meanReward * arm.visits + yieldData.bestYield * yieldData.sampleCount) / newVisits;
+    const newVisits = arm.visits + rewardData.sampleCount;
+    arm.meanReward = (arm.meanReward * arm.visits + rewardData.reward * rewardData.sampleCount) / newVisits;
     arm.visits = newVisits;
-    this.totalVisits += yieldData.sampleCount;
+    this.totalVisits += rewardData.sampleCount;
   }
 
   getArmStats(): { weekIndex: number; weekStartDate: Date; meanReward: number; visits: number; ucb: number }[] {

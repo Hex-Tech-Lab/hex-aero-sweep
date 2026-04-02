@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { updateSearchLog } from '@/lib/supabase-operations';
 import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult, getHistoricPriors, batchedSearchDuffel } from '@/lib/duffel-service';
-import { UCB1, WeeklyYieldData, microBatch } from '@/lib/ucb1';
+import { UCB1, WeeklyYieldData, WeeklyRewardData, microBatch } from '@/lib/ucb1';
 
 type SSEMessage = {
   type: 'metrics' | 'log' | 'candidate' | 'complete' | 'error' | 'duffel_payload';
@@ -165,7 +165,8 @@ export async function GET(request: NextRequest) {
 
       const startDate = new Date(searchWindowStart);
       const endDate = new Date(searchWindowEnd);
-      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime() / (1000 * 60 * 60 * 24)));
+      const DAY_MS = 1000 * 60 * 60 * 24;
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / DAY_MS);
 
       const weekStarts = getWeekStarts(startDate, endDate);
       const weekCount = weekStarts.length;
@@ -243,14 +244,16 @@ export async function GET(request: NextRequest) {
             }
 
             if (bestPrice < Infinity) {
-              const yieldData: WeeklyYieldData = {
+              const yieldDelta = bestPrice - baseCost;
+              const reward = -yieldDelta;
+              const rewardData: WeeklyRewardData = {
                 weekIndex: selectedArm.weekIndex,
                 weekStartDate: probeDate,
-                bestYield: bestPrice - baseCost,
+                reward,
                 sampleCount: 1,
               };
-              ucb1.update(selectedArm.weekIndex, yieldData);
-              phase1Results.push({ weekIndex: selectedArm.weekIndex, bestYield: yieldData.bestYield, sampleCount: 1 });
+              ucb1.update(selectedArm.weekIndex, rewardData);
+              phase1Results.push({ weekIndex: selectedArm.weekIndex, bestYield: yieldDelta, sampleCount: 1 });
             }
 
           } catch (searchError) {

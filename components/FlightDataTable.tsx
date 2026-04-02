@@ -298,9 +298,11 @@ export function FlightDataTable() {
   }, []);
 
   const formatReturnDepTime = useCallback((flight: any) => {
-    const returnDate = flight.returnDate;
-    if (!returnDate) return '--:--';
-    return new Date(returnDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dep = flight.inboundSegments?.[0]?.departureTime;
+    if (dep) {
+      return new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return '--:--';
   }, []);
 
   const formatReturnArrTime = useCallback((flight: any) => {
