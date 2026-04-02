@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { useTicketStore, FlightResult } from '@/src/store/useTicketStore';
 import {
   Table,
@@ -55,6 +55,90 @@ const CARRIER_NAMES: Record<string, string> = {
   '5N': 'Smartavia',
   'S7': 'S7 Airlines',
 };
+
+type FlightRowProps = {
+  flight: any;
+  idx: number;
+  isOutOfRange: boolean;
+  isActive: boolean;
+  onClick: () => void;
+  fareBrand: (f: any) => string;
+  formatDepTime: (f: any) => string;
+  formatArrTime: (f: any) => string;
+  formatReturnDepTime: (f: any) => string;
+  formatReturnArrTime: (f: any) => string;
+  getStatusColor: (d: number) => string;
+  getStatusBadge: (s: string) => React.ReactNode;
+};
+
+const MemoizedFlightRow = memo(function MemoizedFlightRow({
+  flight,
+  idx,
+  isOutOfRange,
+  isActive,
+  onClick,
+  fareBrand,
+  formatDepTime,
+  formatArrTime,
+  formatReturnDepTime,
+  formatReturnArrTime,
+  getStatusColor,
+  getStatusBadge,
+}: FlightRowProps) {
+  const fb = fareBrand(flight);
+  return (
+    <TableRow
+      onClick={onClick}
+      className={cn(
+        'cursor-pointer transition-colors border-b border-slate-800/50',
+        'hover:bg-slate-800/30',
+        idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60',
+        isOutOfRange && 'opacity-60',
+        isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400'
+      )}
+    >
+      <TableCell className={cn('font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
+        {flight.carrier}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatDepTime(flight)}→{formatArrTime(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatReturnDepTime(flight)}→{formatReturnArrTime(flight)}
+      </TableCell>
+      <TableCell className="text-center px-2">
+        <span className="text-[10px] font-mono text-slate-400">
+          {flight.nights}N
+        </span>
+      </TableCell>
+      <TableCell className="px-2">
+        <Badge
+          variant={fb !== 'Standard' ? 'default' : 'outline'}
+          className={cn(
+            'text-[8px] py-0 px-1',
+            fb === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+            fb === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+            fb === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+            fb === 'Standard' && 'text-slate-500 border-slate-600/30'
+          )}
+        >
+          {fb}
+        </Badge>
+      </TableCell>
+      <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
+        ${flight.price.toFixed(2)}
+      </TableCell>
+      <TableCell
+        className={cn('text-right font-mono font-bold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
+      >
+        {flight.yieldDelta >= 0 ? '+' : ''}${flight.yieldDelta.toFixed(2)}
+      </TableCell>
+      <TableCell className="px-2">
+        {getStatusBadge(flight.status)}
+      </TableCell>
+    </TableRow>
+  );
+});
 
 export function FlightDataTable() {
   const { flightResults, ticket } = useTicketStore();
@@ -213,6 +297,21 @@ export function FlightDataTable() {
     return '--:--';
   };
 
+  const formatReturnDepTime = (flight: any) => {
+    const returnDate = flight.returnDate;
+    if (!returnDate) return '--:--';
+    return new Date(returnDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatReturnArrTime = (flight: any) => {
+    if (flight.outboundSegments?.length > 0 && flight.outboundSegments.length > 1) {
+      const lastSeg = flight.outboundSegments[flight.outboundSegments.length - 1];
+      const arr = lastSeg.arrivalTime;
+      return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    }
+    return '--:--';
+  };
+
   const handleRowClick = (flight: any) => {
     setActiveCandidateId(activeCandidateId === flight.id ? null : flight.id);
   };
@@ -332,71 +431,59 @@ export function FlightDataTable() {
 
   return (
     <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden">
-      <div className="px-3 py-2 border-b border-slate-800 flex items-center gap-3">
-        <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide shrink-0">
-          Verified Rebooking Candidates
-        </h3>
-        <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs font-bold rounded">
-          {verifiedCount}
+      <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-2">
+        <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded uppercase">
+          Candidates {verifiedCount}
         </span>
-        <div className="relative flex-1 max-w-xs ml-auto">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+        <div className="relative flex-1 max-w-[140px]">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
           <Input
-            placeholder="Filter (e.g., 5N, A3)"
+            placeholder="Filter..."
             value={filterText}
             onChange={(e) => { setFilterText(e.target.value); setCurrentPage(1); }}
-            className="pl-8 h-7 text-xs bg-slate-950 border-slate-800"
+            className="pl-7 h-6 text-[10px] bg-slate-950 border-slate-800"
           />
           {filterText && (
             <button
               onClick={() => setFilterText('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
               <X className="w-3 h-3" />
             </button>
           )}
         </div>
         <span className="text-[10px] text-slate-500 shrink-0">
-          {filteredAndSortedFlights.length} results
+          {filteredAndSortedFlights.length}
         </span>
       </div>
 
-      <div className="overflow-x-auto max-h-[400px] relative" onMouseMove={handleMouseMove}>
+      <div className="overflow-x-auto max-h-[350px] relative" onMouseMove={handleMouseMove}>
         <Table>
           <TableHeader className="sticky top-0 bg-slate-900 z-10">
             <TableRow className="border-b border-slate-800">
               <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
+                className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2"
                 onClick={() => handleSort('carrier')}
               >
                 Carrier<SortIcon columnKey="carrier" />
               </TableHead>
-              <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
-                onClick={() => handleSort('departureDate')}
-              >
-                Outbound<SortIcon columnKey="departureDate" />
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                Outbound DEP→ARR
               </TableHead>
-              <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
-                onClick={() => handleSort('returnDate')}
-              >
-                Inbound<SortIcon columnKey="returnDate" />
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                Inbound DEP→ARR
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">DEP</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">ARR</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">Nights</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase">Route</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300" onClick={() => handleSort('fareBrand')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Nights</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('fareBrand')}>
                 Brand<SortIcon columnKey="fareBrand" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-right cursor-pointer hover:text-slate-300" onClick={() => handleSort('price')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
                 Price<SortIcon columnKey="price" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-right cursor-pointer hover:text-slate-300" onClick={() => handleSort('yieldDelta')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('yieldDelta')}>
                 Yield<SortIcon columnKey="yieldDelta" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase">Status</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -416,67 +503,21 @@ export function FlightDataTable() {
                 const isOutOfRange = flight.status === 'out_of_range';
                 const isActive = activeCandidateId === flight.id;
                 return (
-                  <TableRow
+                  <MemoizedFlightRow
                     key={flight.id}
+                    flight={flight}
+                    idx={idx}
+                    isOutOfRange={isOutOfRange}
+                    isActive={isActive}
                     onClick={() => handleRowClick(flight)}
-                    className={cn(
-                      'cursor-pointer transition-colors border-b border-slate-800/50',
-                      'hover:bg-slate-800/30',
-                      idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60',
-                      isOutOfRange && 'opacity-60',
-                      isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400'
-                    )}
-                  >
-                    <TableCell className={cn('font-mono font-semibold text-xs', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
-                      {flight.carrier}
-                    </TableCell>
-                    <TableCell className={cn('text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-300')}>
-                      {(flight.departureDate || '').replace('2026-', '')}
-                    </TableCell>
-                    <TableCell className={cn('text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-300')}>
-                      {(flight.returnDate || '').replace('2026-', '')}
-                    </TableCell>
-                    <TableCell className={cn('text-center font-mono text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-                      {formatDepTime(flight)}
-                    </TableCell>
-                    <TableCell className={cn('text-center font-mono text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-                      {formatArrTime(flight)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {flight.nights}N
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={cn('text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-400')}>
-                      {formatRoute(flight)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={fareBrand(flight) !== 'Standard' ? 'default' : 'outline'}
-                        className={cn(
-                          'text-[9px] py-0',
-                          fareBrand(flight) === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                          fareBrand(flight) === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                          fareBrand(flight) === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                          fareBrand(flight) === 'Standard' && 'text-slate-500 border-slate-600/30'
-                        )}
-                      >
-                        {fareBrand(flight)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={cn('text-right font-mono font-semibold text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
-                      ${flight.price.toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={cn('text-right font-mono font-bold text-xs', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
-                    >
-                      {flight.yieldDelta >= 0 ? '+' : ''}
-                      ${flight.yieldDelta.toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(flight.status)}
-                    </TableCell>
-                  </TableRow>
+                    fareBrand={fareBrand}
+                    formatDepTime={formatDepTime}
+                    formatArrTime={formatArrTime}
+                    formatReturnDepTime={formatReturnDepTime}
+                    formatReturnArrTime={formatReturnArrTime}
+                    getStatusColor={getStatusColor}
+                    getStatusBadge={getStatusBadge}
+                  />
                 );
               })
             )}

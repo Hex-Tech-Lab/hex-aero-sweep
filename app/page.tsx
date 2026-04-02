@@ -17,7 +17,13 @@ export default function Home() {
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-500">Loading...</div>
+      </div>
+    );
+  }
 
   const steps = [
     { number: 1, title: 'Ingestion', completed: isTicketValid() },
@@ -37,7 +43,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {currentStep !== 3 && <GlobalHeader mode="wizard" />}
+      <GlobalHeader 
+        mode={currentStep === 3 ? 'execution' : 'wizard'} 
+        onBack={currentStep === 3 ? () => setCurrentStep(2) : undefined}
+      />
 
       {currentStep !== 3 && (
         <WizardNav

@@ -18,6 +18,7 @@ interface DatePickerProps {
   disabled?: boolean;
   minDate?: Date;
   maxDate?: Date;
+  defaultMonth?: Date;
   placeholder?: string;
   className?: string;
 }
@@ -28,6 +29,7 @@ export function DatePicker({
   disabled,
   minDate,
   maxDate,
+  defaultMonth,
   placeholder = "Pick a date",
   className,
 }: DatePickerProps) {
@@ -37,6 +39,8 @@ export function DatePicker({
     onSelect(selectedDate);
     setIsOpen(false);
   };
+
+  const resolvedDefaultMonth = defaultMonth || date || new Date();
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -59,12 +63,12 @@ export function DatePicker({
           mode="single"
           selected={date || undefined}
           onSelect={handleSelect}
+          defaultMonth={resolvedDefaultMonth}
           disabled={(dateToCheck) => {
             if (minDate && dateToCheck < minDate) return true;
             if (maxDate && dateToCheck > maxDate) return true;
             return false;
           }}
-          initialFocus
           className="bg-slate-950"
         />
       </PopoverContent>

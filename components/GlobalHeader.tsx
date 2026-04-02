@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Plane } from 'lucide-react';
+import { Plane, Loader2 } from 'lucide-react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { useSSEStream } from '@/hooks/useSSEStream';
@@ -17,7 +17,6 @@ type HeaderMode = 'wizard' | 'execution';
 type GlobalHeaderProps = {
   mode?: HeaderMode;
   onBack?: () => void;
-  onMetricsChange?: (metrics: any) => void;
 };
 
 export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
@@ -115,14 +114,16 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
     }
   };
 
+  const isRunning = metrics.status === 'running' && isConnected;
+
   return (
     <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-full mx-auto px-4 py-3">
+      <div className="max-w-full mx-auto px-4 py-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <button
               onClick={handleLogoClick}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
             >
               <div className="relative">
                 <motion.div
@@ -130,7 +131,7 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
                   animate={{ rotate: 360 }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
                 >
-                  <svg className="w-8 h-8" viewBox="0 0 32 32" fill="none">
+                  <svg className="w-7 h-7" viewBox="0 0 32 32" fill="none">
                     <path
                       d="M16 4 A12 12 0 0 1 28 16"
                       stroke="#06b6d4"
@@ -140,24 +141,34 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
                     />
                   </svg>
                 </motion.div>
-                <Plane className="w-6 h-6 text-cyan-400" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <Plane className="w-5 h-5 text-cyan-400" />
+                <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-slate-100">
+                <h1 className="text-base font-bold tracking-tight text-slate-100">
                   AEROSWEEP <span className="text-cyan-400">v4.0</span>
                 </h1>
-                <p className="text-[9px] text-slate-500 font-mono uppercase tracking-wider">
+                <p className="text-[8px] text-slate-500 font-mono uppercase tracking-wider">
                   Aviation Pricing Intelligence
                 </p>
               </div>
             </button>
 
             {mode === 'execution' && (
-              <Badge variant={getStatusBadgeVariant()} className="uppercase text-[10px]">
-                <Database className="w-3 h-3 mr-1" />
-                {metrics.status === 'idle' ? 'DB SYNC: STABLE' : `STATUS: ${metrics.status}`}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={getStatusBadgeVariant()} className="uppercase text-[10px]">
+                  <Database className="w-3 h-3 mr-1" />
+                  {metrics.status === 'idle' ? 'DB SYNC: STABLE' : `STATUS: ${metrics.status}`}
+                </Badge>
+                {isRunning && (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  >
+                    <Loader2 className="w-4 h-4 text-cyan-400" />
+                  </motion.div>
+                )}
+              </div>
             )}
           </div>
 
@@ -168,10 +179,10 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
                   onClick={handleStart}
                   disabled={isConnected}
                   size="sm"
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white h-8"
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white h-7 text-xs"
                 >
-                  <Play className="w-3 h-3 mr-2" />
-                  {hasStarted ? 'Re-run Sweep' : 'Initialize Sweep'}
+                  <Play className="w-3 h-3 mr-1.5" />
+                  {hasStarted ? 'Re-run' : 'Initialize Sweep'}
                 </Button>
               ) : (
                 <Button
@@ -179,15 +190,20 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
                   disabled={!isConnected}
                   variant="destructive"
                   size="sm"
-                  className="h-8"
+                  className="h-7 text-xs"
                 >
-                  <Square className="w-3 h-3 mr-2" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  >
+                    <Loader2 className="w-3 h-3 mr-1.5" />
+                  </motion.div>
                   Abort Sweep
                 </Button>
               )}
 
-              <Button variant="outline" size="sm" onClick={onBack} disabled={isConnected} className="h-8">
-                <ChevronLeft className="w-3 h-3 mr-2" />
+              <Button variant="outline" size="sm" onClick={onBack} disabled={isConnected} className="h-7 text-xs">
+                <ChevronLeft className="w-3 h-3 mr-1.5" />
                 Back
               </Button>
             </div>

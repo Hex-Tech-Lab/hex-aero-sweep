@@ -15,6 +15,39 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+function generateSparseDates(startDate: Date, endDate: Date, numDates: number): Date[] {
+  const dates: Date[] = [];
+  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const step = totalDays / numDates;
+  
+  for (let i = 0; i < numDates; i++) {
+    const dayOffset = Math.round(i * step);
+    const date = addDays(startDate, dayOffset);
+    if (date <= endDate && !dates.some(d => d.toDateString() === date.toDateString())) {
+      dates.push(date);
+    }
+  }
+  
+  if (dates.length < numDates && dates[dates.length - 1] < endDate) {
+    dates.push(endDate);
+  }
+  
+  return dates.slice(0, numDates);
+}
+
+function generateDenseDates(centerDate: Date, numDates: number, windowDays: number = 3): Date[] {
+  const dates: Date[] = [];
+  
+  for (let offset = -windowDays; offset <= windowDays; offset++) {
+    if (offset === 0) continue;
+    dates.push(addDays(centerDate, offset));
+  }
+  
+  dates.unshift(centerDate);
+  
+  return dates.sort((a, b) => a.getTime() - b.getTime()).slice(0, numDates);
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
@@ -28,16 +61,13 @@ export async function GET(request: NextRequest) {
   const priceTolerance = parseFloat(searchParams.get('priceTolerance') || '50');
   const maxApiCalls = parseInt(searchParams.get('maxApiCalls') || '100');
   const baseCost = parseFloat(searchParams.get('baseCost') || '500');
-  const passengers = parseInt(searchParams.get('passengers') || '1');
-  const fareClass = (searchParams.get('fareClass') || 'ECONOMY').toLowerCase();
   const passengerCount = parseInt(searchParams.get('passengers') || '1');
+  const fareClass = (searchParams.get('fareClass') || 'ECONOMY').toLowerCase();
 
-  // Rebooking mode preferences
   const directFlightOnly = searchParams.get('directFlightOnly') === 'true';
   const outboundTimePreference = searchParams.get('outboundTimePreference') || 'any';
   const inboundTimePreference = searchParams.get('inboundTimePreference') || 'any';
 
-  // Passenger breakdown for child discount verification
   const passengerBreakdownRaw = searchParams.get('passengerBreakdown');
   let passengerBreakdown = undefined;
   if (passengerBreakdownRaw) {
@@ -130,7 +160,7 @@ export async function GET(request: NextRequest) {
         type: 'log',
         data: {
           level: 'success',
-          message: '[DUFFEL] Live API authenticated - enforcing strict carrier matching',
+          message: '[DUFFEL] Live API authenticated',
         },
       });
 
@@ -138,23 +168,40 @@ export async function GET(request: NextRequest) {
         type: 'log',
         data: {
           level: 'info',
-          message: `[CONFIG] Carrier Filter: ${originalCarrier} | Route: ${origin}-${destination}`,
+          message: `[CONFIG] Carrier: ${originalCarrier} | Route: ${origin}-${destination} | Nights: ${minNights}-${maxNights}`,
         },
       });
 
       const startDate = new Date(searchWindowStart);
       const endDate = new Date(searchWindowEnd);
 
-      let currentDate = new Date(startDate);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      const phase1Calls = Math.floor(maxApiCalls / 2);
+      const phase2Calls = maxApiCalls - phase1Calls;
+
+      sendMessage({
+        type: 'log',
+        data: {
+          level: 'info',
+          message: `[PROBE PHASE] Exploring ${phase1Calls} sparse dates across ${totalDays} day window`,
+        },
+      });
+
+      const phase1Dates = generateSparseDates(startDate, endDate, phase1Calls);
+
+      const phase1Results: { date: Date; bestPrice: number; bestYield: number }[] = [];
 
       try {
-        while (currentDate <= endDate && totalApiCalls < maxApiCalls) {
-          const departureDate = currentDate.toISOString().split('T')[0];
+        for (const probeDate of phase1Dates) {
+          if (totalApiCalls >= maxApiCalls) break;
+
+          const departureDate = probeDate.toISOString().split('T')[0];
 
           for (let nights = minNights; nights <= maxNights; nights++) {
             if (totalApiCalls >= maxApiCalls) break;
 
-            const returnDate = addDays(currentDate, nights).toISOString().split('T')[0];
+            const returnDate = addDays(probeDate, nights).toISOString().split('T')[0];
 
             if (new Date(returnDate) > endDate) continue;
 
@@ -164,7 +211,7 @@ export async function GET(request: NextRequest) {
               type: 'log',
               data: {
                 level: 'info',
-                message: `[CALL ${totalApiCalls}/${maxApiCalls}] Querying: ${departureDate} -> ${returnDate} (${nights}N)`,
+                message: `[PROBE ${totalApiCalls}/${phase1Calls}] ${departureDate} (${nights}N)`,
               },
             });
 
@@ -188,7 +235,6 @@ export async function GET(request: NextRequest) {
 
               const { candidates, rawOffersCount, rejectedCount } = searchResult;
 
-              // Send raw offers count to frontend
               totalScanned += rawOffersCount;
               outOfRange += rejectedCount;
 
@@ -198,22 +244,13 @@ export async function GET(request: NextRequest) {
                   totalScanned,
                   candidatesFound,
                   outOfRange,
-                  rawOffersCount,
-                  rejectedCount,
+                  progress: `${totalApiCalls}/${maxApiCalls}`,
+                  phase: 'PROBE',
                 },
               });
 
-              if (DEVELOPER_VERBOSE_MODE && candidates.length > 0) {
-                sendMessage({
-                  type: 'duffel_payload',
-                  data: {
-                    query: { origin, destination, departureDate, returnDate },
-                    candidatesReturned: candidates.length,
-                    rawOffersCount,
-                    rawPayload: candidates,
-                  },
-                });
-              }
+              let bestPrice = Infinity;
+              let bestYield = Infinity;
 
               for (const candidate of candidates) {
                 const isVerified = candidate.status === 'verified';
@@ -224,18 +261,142 @@ export async function GET(request: NextRequest) {
                     type: 'log',
                     data: {
                       level: 'success',
-                      message: `[MATCH] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
+                      message: `[MATCH] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)}`,
                     },
                   });
                 } else {
                   outOfRange++;
+                }
+
+                sendMessage({
+                  type: 'candidate',
+                  data: candidate,
+                });
+
+                if (candidate.price < bestPrice) {
+                  bestPrice = candidate.price;
+                  bestYield = candidate.yieldDelta;
+                }
+              }
+
+              if (bestPrice < Infinity) {
+                phase1Results.push({
+                  date: probeDate,
+                  bestPrice,
+                  bestYield,
+                });
+              }
+
+            } catch (searchError) {
+              sendMessage({
+                type: 'log',
+                data: {
+                  level: 'warning',
+                  message: `[ERROR] ${departureDate}: ${searchError instanceof Error ? searchError.message : 'Unknown'}`,
+                },
+              });
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+
+        let bestProbeDate = startDate;
+        if (phase1Results.length > 0) {
+          const bestResult = phase1Results.reduce((best, current) => 
+            current.bestPrice < best.bestPrice ? current : best
+          );
+          bestProbeDate = bestResult.date;
+        }
+
+        sendMessage({
+          type: 'log',
+          data: {
+            level: 'success',
+            message: `[PROBE COMPLETE] Best date: ${bestProbeDate.toISOString().split('T')[0]} ($${phase1Results.find(r => r.date.getTime() === bestProbeDate.getTime())?.bestPrice.toFixed(2) || 'N/A'})`,
+          },
+        });
+
+        sendMessage({
+          type: 'log',
+          data: {
+            level: 'info',
+            message: `[EXTRACTION PHASE] Dense scanning ${phase2Calls} dates around ${bestProbeDate.toISOString().split('T')[0]}`,
+          },
+        });
+
+        const phase2Dates = generateDenseDates(bestProbeDate, phase2Calls, Math.floor(phase2Calls / 4));
+
+        for (const denseDate of phase2Dates) {
+          if (totalApiCalls >= maxApiCalls) break;
+
+          const departureDate = denseDate.toISOString().split('T')[0];
+
+          for (let nights = minNights; nights <= maxNights; nights++) {
+            if (totalApiCalls >= maxApiCalls) break;
+
+            const returnDate = addDays(denseDate, nights).toISOString().split('T')[0];
+
+            if (new Date(returnDate) > endDate) continue;
+
+            totalApiCalls++;
+
+            sendMessage({
+              type: 'log',
+              data: {
+                level: 'info',
+                message: `[EXTRACT ${totalApiCalls}/${maxApiCalls}] ${departureDate} (${nights}N)`,
+              },
+            });
+
+            try {
+              const searchResult: SearchResult = await searchDuffelOffers({
+                origin,
+                destination,
+                departureDate,
+                returnDate,
+                passengers: passengerCount,
+                cabinClass,
+                originalTicket: originalTicketData,
+                baseCost,
+                preferences: {
+                  directFlightOnly,
+                  outboundTimePreference: outboundTimePreference as any,
+                  inboundTimePreference: inboundTimePreference as any,
+                  passengerBreakdown,
+                },
+              });
+
+              const { candidates, rawOffersCount, rejectedCount } = searchResult;
+
+              totalScanned += rawOffersCount;
+              outOfRange += rejectedCount;
+
+              sendMessage({
+                type: 'metrics',
+                data: {
+                  totalScanned,
+                  candidatesFound,
+                  outOfRange,
+                  progress: `${totalApiCalls}/${maxApiCalls}`,
+                  phase: 'EXTRACT',
+                },
+              });
+
+              for (const candidate of candidates) {
+                const isVerified = candidate.status === 'verified';
+                
+                if (isVerified) {
+                  candidatesFound++;
                   sendMessage({
                     type: 'log',
                     data: {
-                      level: 'warning',
-                      message: `[OUT OF RANGE] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} exceeds Δ$${candidate.yieldDelta.toFixed(2)}`,
+                      level: 'success',
+                      message: `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
                     },
                   });
+                } else {
+                  outOfRange++;
                 }
 
                 sendMessage({
@@ -244,41 +405,17 @@ export async function GET(request: NextRequest) {
                 });
               }
 
-              sendMessage({
-                type: 'metrics',
-                data: {
-                  totalScanned,
-                  candidatesFound,
-                  outOfRange,
-                  rawOffersCount,
-                  rejectedCount,
-                  progress: `${totalApiCalls}/${maxApiCalls}`,
-                },
-              });
-
             } catch (searchError) {
               sendMessage({
                 type: 'log',
                 data: {
                   level: 'warning',
-                  message: `[ERROR] Query failed for ${departureDate}: ${searchError instanceof Error ? searchError.message : 'Unknown error'}`,
+                  message: `[ERROR] ${departureDate}: ${searchError instanceof Error ? searchError.message : 'Unknown'}`,
                 },
               });
             }
 
             await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-
-          currentDate = addDays(currentDate, 1);
-
-          if (totalApiCalls % 5 === 0) {
-            sendMessage({
-              type: 'log',
-              data: {
-                level: 'warning',
-                message: `>>> PHASE SHIFT: DATE FLEX (${currentDate.toISOString().split('T')[0]}) <<<`,
-              },
-            });
           }
         }
 
@@ -286,7 +423,7 @@ export async function GET(request: NextRequest) {
           type: 'log',
           data: {
             level: 'success',
-            message: `[COMPLETE] Sweep finished. Scanned: ${totalScanned} | Matches: ${candidatesFound} | API Calls: ${totalApiCalls}`,
+            message: `[COMPLETE] Scanned: ${totalScanned} | Matches: ${candidatesFound} | Out of Range: ${outOfRange}`,
           },
         });
 
@@ -310,6 +447,7 @@ export async function GET(request: NextRequest) {
         } catch (dbError) {
           console.error('Failed to update search log on completion:', dbError);
         }
+
       } catch (error) {
         sendMessage({
           type: 'error',

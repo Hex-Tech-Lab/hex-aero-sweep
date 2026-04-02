@@ -230,7 +230,7 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
   const effectiveMinDate = today;
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    <div className="max-w-3xl mx-auto px-4 pb-24">
       <div className="mb-4">
         <h2 className="text-xl font-bold text-slate-100 mb-1">
           CONFIGURATION PARAMETERS
@@ -242,29 +242,29 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
 
       {/* REBOOKING MODE Alert */}
       {rebookingActive && (
-        <Alert className="mb-4 border-amber-600 bg-amber-950/30">
-          <Plane className="h-3 w-3 text-amber-500" />
-          <AlertDescription className="text-xs text-amber-200">
-            <strong className="text-amber-400">REBOOKING MODE:</strong> Original departure was in the past. Search Window is configured for future travel dates in 2026.
+        <Alert className="mb-2 py-2 border-amber-600/50 bg-amber-950/20">
+          <Plane className="h-3 w-3 text-amber-500 shrink-0" />
+          <AlertDescription className="text-[11px] text-amber-200">
+            <strong className="text-amber-400">REBOOKING:</strong> Original departure was in the past. Search Window is configured for future travel dates in 2026.
           </AlertDescription>
         </Alert>
       )}
 
       {isRebookingMode() && (
-        <Alert variant="warning" className="mb-4 border-amber-600 bg-amber-950/30">
-          <AlertTriangle className="h-3 w-3 text-amber-500" />
-          <AlertDescription className="text-xs text-amber-200">
-            <strong className="text-amber-400">REBOOKING OVERRIDE:</strong> Original ticket expiration is bypassed for future search.
+        <Alert variant="warning" className="mb-2 py-2 border-amber-600/50 bg-amber-950/20">
+          <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+          <AlertDescription className="text-[11px] text-amber-200">
+            <strong className="text-amber-400">OVERRIDE:</strong> Original ticket expiration is bypassed for future search.
           </AlertDescription>
         </Alert>
       )}
 
       {(isTicketExpired() || !isValidExpiration) && !isRebookingMode() && (
-        <Alert variant="destructive" className="mb-4 border-red-900 bg-red-950/30">
-          <AlertTriangle className="h-3 w-3" />
-          <AlertDescription className="text-xs">
+        <Alert variant="destructive" className="mb-2 py-2 border-red-900/50 bg-red-950/20">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <AlertDescription className="text-[11px]">
             <strong>CIRCUIT BREAKER:</strong> Ticket expired on{' '}
-            {!isValidExpiration ? 'No Expiry Found - Defaulting to 1 Year' : expirationDate!.toISOString().split('T')[0]}
+            {!isValidExpiration ? 'No Expiry Found' : expirationDate!.toISOString().split('T')[0]}
           </AlertDescription>
         </Alert>
       )}
@@ -303,6 +303,7 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
                       : new Date(effectiveMinDate + 'T00:00:00')
                   }
                   maxDate={effectiveMaxDate ? new Date(effectiveMaxDate) : undefined}
+                  defaultMonth={config.searchWindowStart ? new Date(config.searchWindowStart) : undefined}
                   placeholder="Select end date"
                   className="text-xs h-9"
                 />
@@ -429,9 +430,9 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
 
           {/* Passenger Verification */}
           {(noMarkerFound || isManualOverride) && passengerCount > 0 && (
-            <Alert variant="warning" className="mb-4 border-amber-600/50 bg-amber-950/20">
-              <AlertTriangle className="h-3 w-3 text-amber-500" />
-              <AlertDescription className="text-xs text-amber-200">
+            <Alert variant="warning" className="mb-3 py-2 border-amber-600/50 bg-amber-950/20">
+              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+              <AlertDescription className="text-[11px] text-amber-200">
                 <strong className="text-amber-400">PDF SILENT:</strong> Passenger types not detected. Verify manually for accurate pricing.
               </AlertDescription>
             </Alert>
