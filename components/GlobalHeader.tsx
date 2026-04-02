@@ -12,14 +12,12 @@ import { Play, Square, ChevronLeft, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-type HeaderMode = 'wizard' | 'execution';
-
 type GlobalHeaderProps = {
-  mode?: HeaderMode;
+  currentStep: number;
   onBack?: () => void;
 };
 
-export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
+export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
   const router = useRouter();
   const resetStore = useTicketStore((state) => state.resetStore);
   const { ticket, config, metrics, setMetrics, clearLogs, clearFlightResults, addLog, sweepExecutionId } = useTicketStore();
@@ -154,7 +152,7 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
               </div>
             </button>
 
-            {mode === 'execution' && (
+            {currentStep === 3 && (
               <div className="flex items-center gap-2">
                 <Badge variant={getStatusBadgeVariant()} className="uppercase text-[10px]">
                   <Database className="w-3 h-3 mr-1" />
@@ -173,7 +171,7 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
             )}
           </div>
 
-          {mode === 'execution' && (
+          {currentStep === 3 && (
             <div className="flex items-center gap-2">
               {!hasStarted || metrics.status === 'completed' || metrics.status === 'error' ? (
                 <Button

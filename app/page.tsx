@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
+import { GlobalHeader } from '@/components/GlobalHeader';
 import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
 import { ConfigStep } from '@/components/ConfigStep';
@@ -46,13 +47,16 @@ export default function Home() {
 
   return (
     <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
-      {currentStep !== 3 && (
-        <WizardNav
-          steps={steps}
-          currentStep={currentStep}
-          onStepClick={handleStepClick}
-        />
-      )}
+      <GlobalHeader
+        currentStep={currentStep}
+        onBack={() => setCurrentStep(Math.max(1, currentStep - 1))}
+      />
+
+      <WizardNav
+        steps={steps}
+        currentStep={currentStep}
+        onStepClick={handleStepClick}
+      />
 
       {currentStep === 1 && (
         <IntakeStep onNext={() => setCurrentStep(2)} />
