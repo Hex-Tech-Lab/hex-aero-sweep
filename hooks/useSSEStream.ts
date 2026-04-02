@@ -29,8 +29,8 @@ type UseSSEStreamOptions = {
   onError?: (error: string) => void;
 };
 
-const BATCH_INTERVAL_MS = 500;
-const MAX_BATCH_SIZE = 100;
+const BATCH_INTERVAL_MS = 200;
+const MAX_BATCH_SIZE = 50;
 
 export function useSSEStream() {
   const [isConnected, setIsConnected] = useState(false);

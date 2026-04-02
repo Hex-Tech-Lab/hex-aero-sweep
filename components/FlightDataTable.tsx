@@ -153,16 +153,46 @@ type FlightRowProps = {
   );
 });
 
+type PresetFilter = 'All' | 'Top Matches' | 'Cheapest' | 'Shortest';
+
 export function FlightDataTable() {
   const { flightResults, ticket } = useTicketStore();
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [activePreset, setActivePreset] = useState<PresetFilter>('All');
   const pageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setFilterText(inputValue);
+      if (inputValue !== '' || activePreset !== 'All') {
+        setCurrentPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [inputValue]);
 
   const filteredAndSortedFlights = useMemo(() => {
     let result = [...flightResults];
+
+    if (activePreset === 'Top Matches') {
+      result = result.filter(f => f.status === 'verified' || f.status === 'live');
+      result.sort((a, b) => a.price - b.price);
+      return result.slice(0, 3);
+    }
+
+    if (activePreset === 'Cheapest') {
+      result.sort((a, b) => a.price - b.price);
+      return result;
+    }
+
+    if (activePreset === 'Shortest') {
+      result.sort((a, b) => a.nights - b.nights);
+      return result;
+    }
 
     if (filterText) {
       const lower = filterText.toLowerCase();
@@ -213,7 +243,7 @@ export function FlightDataTable() {
     });
 
     return result;
-  }, [flightResults, sortConfig, filterText]);
+  }, [flightResults, sortConfig, filterText, activePreset]);
 
   const totalPages = Math.ceil(filteredAndSortedFlights.length / ROWS_PER_PAGE);
   const paginatedFlights = filteredAndSortedFlights.slice(
@@ -453,29 +483,42 @@ export function FlightDataTable() {
   return (
     <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden">
       <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-2">
-        <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded uppercase">
-          Candidates {verifiedCount}
+        <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded uppercase shrink-0">
+          {filteredAndSortedFlights.length}
         </span>
-        <div className="relative flex-1 max-w-[140px]">
+        <div className="flex items-center gap-1 shrink-0">
+          {(['All', 'Top Matches', 'Cheapest', 'Shortest'] as PresetFilter[]).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => { setActivePreset(preset); setCurrentPage(1); }}
+              className={cn(
+                'px-1.5 py-0.5 text-[8px] font-medium rounded border transition-colors',
+                activePreset === preset
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50'
+                  : 'bg-slate-900/50 text-slate-500 border-slate-800 hover:border-slate-700'
+              )}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 max-w-[120px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
           <Input
-            placeholder="Filter..."
-            value={filterText}
-            onChange={(e) => { setFilterText(e.target.value); setCurrentPage(1); }}
+            placeholder="Search..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             className="pl-7 h-6 text-[10px] bg-slate-950 border-slate-800"
           />
-          {filterText && (
+          {inputValue && (
             <button
-              onClick={() => setFilterText('')}
+              onClick={() => { setInputValue(''); setFilterText(''); }}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
               <X className="w-3 h-3" />
             </button>
           )}
         </div>
-        <span className="text-[10px] text-slate-500 shrink-0">
-          {filteredAndSortedFlights.length}
-        </span>
       </div>
 
       <div className="overflow-x-auto max-h-[350px] relative">
