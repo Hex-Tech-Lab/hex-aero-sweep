@@ -59,9 +59,10 @@ export function VolatilityChart() {
   }, [flightResults]);
 
   const volatilityMetrics = useMemo(() => {
-    if (flightResults.length < 2) return { stdDev: 0, priceSpan: 0, minPrice: 0, maxPrice: 0 };
+    const verifiedFlights = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
+    if (verifiedFlights.length < 2) return { stdDev: 0, priceSpan: 0, minPrice: 0, maxPrice: 0 };
     
-    const prices = flightResults.map(f => f.price);
+    const prices = verifiedFlights.map(f => f.price);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length;

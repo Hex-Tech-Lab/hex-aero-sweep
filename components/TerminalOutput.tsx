@@ -69,7 +69,7 @@ export function TerminalOutput() {
                 <span className="text-slate-700 shrink-0">
                   [{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
                 </span>
-                <span className={cn(logColorClass[log.level] || 'text-slate-500', 'truncate')}>
+                <span className={cn(logColorClass[log.level] || 'text-slate-500', 'whitespace-pre-wrap break-all')}>
                   {log.message}
                 </span>
               </div>

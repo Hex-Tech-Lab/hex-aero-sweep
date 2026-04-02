@@ -43,6 +43,7 @@ export type ExecutionMetrics = {
   candidatesFound: number;
   outOfRange: number;
   status: 'idle' | 'running' | 'completed' | 'error' | 'aborted';
+  progress?: string;
 };
 
 export type TerminalLog = {
@@ -125,6 +126,7 @@ const initialMetrics: ExecutionMetrics = {
   candidatesFound: 0,
   outOfRange: 0,
   status: 'idle',
+  progress: undefined,
 };
 
 const MAX_LOGS = 500;

@@ -162,6 +162,7 @@ export function GlobalHeader({ mode = 'wizard', onBack }: GlobalHeaderProps) {
                 </Badge>
                 {isRunning && (
                   <motion.div
+                    className="ml-1"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   >

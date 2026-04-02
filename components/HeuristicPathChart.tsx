@@ -77,6 +77,10 @@ export function HeuristicPathChart() {
               <div className="w-1 h-1 rounded-full bg-slate-400" />
               <span className="text-slate-500">{stats.neutral}</span>
             </div>
+            <div className="flex items-center gap-0.5">
+              <div className="w-1 h-1 rounded-full bg-red-400" />
+              <span className="text-slate-500">{stats.negative}</span>
+            </div>
           </div>
         )}
       </div>

@@ -226,14 +226,14 @@ export function FlightDataTable() {
       : <ChevronDown className="w-3 h-3 ml-1 inline" />;
   };
 
-  const getStatusColor = (yieldDelta: number) => {
+  const getStatusColor = useCallback((yieldDelta: number) => {
     if (yieldDelta < -50) return 'text-emerald-400';
     if (yieldDelta < 0) return 'text-cyan-400';
     if (yieldDelta < 50) return 'text-orange-400';
     return 'text-red-400';
-  };
+  }, []);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     const statusLower = status.toLowerCase();
 
     if (statusLower.includes('exact') || statusLower.includes('verified') || statusLower.includes('live')) {
@@ -265,56 +265,56 @@ export function FlightDataTable() {
         {status.toUpperCase()}
       </span>
     );
-  };
+  }, []);
 
-  const formatSegmentInfo = (flight: any) => {
+  const formatSegmentInfo = useCallback((flight: any) => {
     const segments = flight.metadata?.segments || 1;
     if (segments === 1) return 'Direct';
     return `${segments - 1} Stop${segments > 2 ? 's' : ''}`;
-  };
+  }, []);
 
-  const formatRoute = (flight: any) => {
+  const formatRoute = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const first = flight.outboundSegments[0];
       return `${first.origin} → ${first.destination}`;
     }
     return 'N/A';
-  };
+  }, []);
 
-  const formatDepTime = (flight: any) => {
+  const formatDepTime = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const dep = flight.outboundSegments[0].departureTime;
       return dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
     }
     return '--:--';
-  };
+  }, []);
 
-  const formatArrTime = (flight: any) => {
+  const formatArrTime = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const arr = flight.outboundSegments[0].arrivalTime;
       return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
     }
     return '--:--';
-  };
+  }, []);
 
-  const formatReturnDepTime = (flight: any) => {
+  const formatReturnDepTime = useCallback((flight: any) => {
     const returnDate = flight.returnDate;
     if (!returnDate) return '--:--';
     return new Date(returnDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  }, []);
 
-  const formatReturnArrTime = (flight: any) => {
-    if (flight.outboundSegments?.length > 0 && flight.outboundSegments.length > 1) {
-      const lastSeg = flight.outboundSegments[flight.outboundSegments.length - 1];
+  const formatReturnArrTime = useCallback((flight: any) => {
+    if (flight.inboundSegments?.length > 0) {
+      const lastSeg = flight.inboundSegments[flight.inboundSegments.length - 1];
       const arr = lastSeg.arrivalTime;
       return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
     }
     return '--:--';
-  };
+  }, []);
 
-  const handleRowClick = (flight: any) => {
+  const handleRowClick = useCallback((flight: any) => {
     setActiveCandidateId(activeCandidateId === flight.id ? null : flight.id);
-  };
+  }, [activeCandidateId]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const threshold = window.innerWidth - 300;
@@ -351,8 +351,8 @@ export function FlightDataTable() {
   }, [stopPaging]);
 
   const verifiedCount = flightResults.filter(f => f.status === 'verified').length;
-  const fareBrand = (flight: any) => flight.metadata?.fareBrand || flight.fareBrand || 'Standard';
-  const carrierName = (code: string) => CARRIER_NAMES[code] || code;
+  const fareBrand = useCallback((flight: any) => flight.metadata?.fareBrand || flight.fareBrand || 'Standard', []);
+  const carrierName = useCallback((code: string) => CARRIER_NAMES[code] || code, []);
 
   const selectedFlight = useMemo(() => {
     return flightResults.find(f => f.id === activeCandidateId) || null;
