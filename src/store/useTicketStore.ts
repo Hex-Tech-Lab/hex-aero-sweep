@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, PersistStorage } from 'zustand/middleware';
 
 export type TicketData = {
   pnr: string;
@@ -131,9 +130,7 @@ const initialMetrics: ExecutionMetrics = {
 
 const MAX_LOGS = 500;
 
-export const useTicketStore = create<TicketStore>()(
-  persist(
-    (set, get) => ({
+export const useTicketStore = create<TicketStore>()((set, get) => ({
   ticket: initialTicket,
   config: initialConfig,
   metrics: initialMetrics,
@@ -212,7 +209,6 @@ export const useTicketStore = create<TicketStore>()(
 
   isRebookingMode: () => {
     const { ticket } = get();
-    // Rebooking mode: original departure is in the past
     if (!ticket.departureDate) return false;
     return new Date(ticket.departureDate) < new Date();
   },
@@ -232,7 +228,6 @@ export const useTicketStore = create<TicketStore>()(
   isConfigValid: () => {
     const { config, ticket } = get();
 
-    // For rebooking mode (original departure in past), allow any future date in 2026
     const isRebooking = ticket.departureDate && new Date(ticket.departureDate) < new Date();
 
     if (!ticket.expirationDate && !isRebooking) return false;
@@ -242,7 +237,6 @@ export const useTicketStore = create<TicketStore>()(
       config.searchWindowEnd !== null &&
       config.searchWindowStart <= config.searchWindowEnd;
 
-    // In rebooking mode, validate against 2026-12-31; otherwise use expiration date
     const maxAllowedDate = isRebooking
       ? new Date('2026-12-31')
       : new Date(ticket.expirationDate!);
@@ -251,7 +245,6 @@ export const useTicketStore = create<TicketStore>()(
       config.searchWindowEnd !== null &&
       new Date(config.searchWindowEnd) <= maxAllowedDate;
 
-    // Also ensure start date is in the future
     const isStartInFuture =
       config.searchWindowStart !== null &&
       new Date(config.searchWindowStart) >= new Date();
@@ -273,7 +266,4 @@ export const useTicketStore = create<TicketStore>()(
       hasValidApiCalls
     );
   },
-    }),
-    { name: 'aerosweep-wizard-storage' }
-  )
-);
+}));
