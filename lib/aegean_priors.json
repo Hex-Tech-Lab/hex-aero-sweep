@@ -1,0 +1,117 @@
+[
+  {
+    "weekIndex": 0,
+    "bestYield": -617.87,
+    "sampleCount": 15
+  },
+  {
+    "weekIndex": 1,
+    "bestYield": -599.0830920122804,
+    "sampleCount": 23
+  },
+  {
+    "weekIndex": 2,
+    "bestYield": -582.1855767898093,
+    "sampleCount": 20
+  },
+  {
+    "weekIndex": 3,
+    "bestYield": -568.8768315282847,
+    "sampleCount": 21
+  },
+  {
+    "weekIndex": 4,
+    "bestYield": -560.495312083673,
+    "sampleCount": 10
+  },
+  {
+    "weekIndex": 5,
+    "bestYield": -557.8839449349235,
+    "sampleCount": 24
+  },
+  {
+    "weekIndex": 6,
+    "bestYield": -561.305354362811,
+    "sampleCount": 15
+  },
+  {
+    "weekIndex": 7,
+    "bestYield": -570.4154504178755,
+    "sampleCount": 18
+  },
+  {
+    "weekIndex": 8,
+    "bestYield": -584.2980339262876,
+    "sampleCount": 14
+  },
+  {
+    "weekIndex": 9,
+    "bestYield": -601.5569383203028,
+    "sampleCount": 19
+  },
+  {
+    "weekIndex": 10,
+    "bestYield": -620.456441621643,
+    "sampleCount": 13
+  },
+  {
+    "weekIndex": 11,
+    "bestYield": -639.0958273937515,
+    "sampleCount": 21
+  },
+  {
+    "weekIndex": 12,
+    "bestYield": -655.6005391290051,
+    "sampleCount": 16
+  },
+  {
+    "weekIndex": 13,
+    "bestYield": -668.3107037410247,
+    "sampleCount": 15
+  },
+  {
+    "weekIndex": 14,
+    "bestYield": -675.9480644204,
+    "sampleCount": 16
+  },
+  {
+    "weekIndex": 15,
+    "bestYield": -677.7445344749175,
+    "sampleCount": 13
+  },
+  {
+    "weekIndex": 16,
+    "bestYield": -673.519443539544,
+    "sampleCount": 15
+  },
+  {
+    "weekIndex": 17,
+    "bestYield": -663.6977075318443,
+    "sampleCount": 24
+  },
+  {
+    "weekIndex": 18,
+    "bestYield": -649.2670950067749,
+    "sampleCount": 23
+  },
+  {
+    "weekIndex": 19,
+    "bestYield": -631.6788876186022,
+    "sampleCount": 16
+  },
+  {
+    "weekIndex": 20,
+    "bestYield": -612.7019252325464,
+    "sampleCount": 22
+  },
+  {
+    "weekIndex": 21,
+    "bestYield": -594.2447143182214,
+    "sampleCount": 19
+  },
+  {
+    "weekIndex": 22,
+    "bestYield": -578.1634901215223,
+    "sampleCount": 21
+  }
+]

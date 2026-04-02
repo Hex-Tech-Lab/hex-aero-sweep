@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
+import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
@@ -12,12 +13,20 @@ import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const { currentStep, setCurrentStep, isTicketValid, isConfigValid } = useTicketStore();
+  const isVisible = useTelemetryStore(state => state.isVisible);
+  const isExpanded = useTelemetryStore(state => state.isExpanded);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-500">Loading...</div>
+      </div>
+    );
+  }
 
   const steps = [
     { number: 1, title: 'Ingestion', completed: isTicketValid() },
@@ -35,9 +44,14 @@ export default function Home() {
     }
   };
 
+  const bottomPadding = isVisible ? (isExpanded ? 'pb-[30vh]' : 'pb-16') : '';
+
   return (
-    <div className="min-h-screen bg-slate-950">
-      {currentStep !== 3 && <GlobalHeader mode="wizard" />}
+    <div className={`min-h-screen bg-slate-950 ${bottomPadding}`}>
+      <GlobalHeader
+        currentStep={currentStep}
+        onBack={() => setCurrentStep(Math.max(1, currentStep - 1))}
+      />
 
       {currentStep !== 3 && (
         <WizardNav

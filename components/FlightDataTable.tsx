@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { useTicketStore, FlightResult } from '@/src/store/useTicketStore';
 import {
   Table,
@@ -31,7 +31,8 @@ type FlightSegment = {
 };
 
 type FlightWithSegments = FlightResult & {
-  outboundSegments?: FlightSegment[];
+  outboundSegments: FlightSegment[];
+  inboundSegments: FlightSegment[];
 };
 
 const ROWS_PER_PAGE = 10;
@@ -56,18 +57,145 @@ const CARRIER_NAMES: Record<string, string> = {
   'S7': 'S7 Airlines',
 };
 
+type FlightRowProps = {
+  flight: any;
+  idx: number;
+  isOutOfRange: boolean;
+  isActive: boolean;
+  isTopMatch: boolean;
+  onClick: () => void;
+  fareBrand: (f: any) => string;
+  formatOutboundDate: (f: any) => string;
+  formatOutboundTime: (f: any) => string;
+  formatInboundDate: (f: any) => string;
+  formatInboundTime: (f: any) => string;
+  getStatusColor: (d: number) => string;
+  getStatusBadge: (s: string) => React.ReactNode;
+};
+
+  const MemoizedFlightRow = memo(function MemoizedFlightRow({
+  flight,
+  idx,
+  isOutOfRange,
+  isActive,
+  isTopMatch,
+  onClick,
+  fareBrand,
+  formatOutboundDate,
+  formatOutboundTime,
+  formatInboundDate,
+  formatInboundTime,
+  getStatusColor,
+  getStatusBadge,
+}: FlightRowProps) {
+  const fb = fareBrand(flight);
+  return (
+    <TableRow
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onClick();
+        if (e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
+      tabIndex={0}
+      role="button"
+      className={cn(
+        'cursor-pointer transition-colors border-b border-slate-800/50',
+        'hover:bg-slate-800/30',
+        idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60',
+        isOutOfRange && 'opacity-60',
+        isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400',
+        isTopMatch && 'bg-amber-900/20 border-l-2 border-amber-500'
+      )}
+    >
+      <TableCell className={cn('font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
+        {flight.carrier}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatOutboundDate(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatOutboundTime(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatInboundDate(flight)}
+      </TableCell>
+      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatInboundTime(flight)}
+      </TableCell>
+      <TableCell className="text-center px-2">
+        <span className="text-[10px] font-mono text-slate-400">
+          {flight.nights}N
+        </span>
+      </TableCell>
+      <TableCell className="px-2">
+        <Badge
+          variant={fb !== 'Standard' ? 'default' : 'outline'}
+          className={cn(
+            'text-[8px] py-0 px-1',
+            fb === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+            fb === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+            fb === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+            fb === 'Standard' && 'text-slate-500 border-slate-600/30'
+          )}
+        >
+          {fb}
+        </Badge>
+      </TableCell>
+      <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
+        ${flight.price.toFixed(2)}
+      </TableCell>
+      <TableCell
+        className={cn('text-right font-mono font-bold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
+      >
+        {flight.yieldDelta >= 0 ? '+' : ''}${flight.yieldDelta.toFixed(2)}
+      </TableCell>
+      <TableCell className="px-2">
+        {getStatusBadge(flight.status)}
+      </TableCell>
+    </TableRow>
+  );
+});
+
+type PresetFilter = 'All' | 'Top Matches' | 'Cheapest' | 'Shortest';
+
 export function FlightDataTable() {
   const { flightResults, ticket } = useTicketStore();
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number; side: 'left' | 'right' }>({ x: 0, y: 0, side: 'left' });
-  const [isPaging, setIsPaging] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [activePreset, setActivePreset] = useState<PresetFilter>('All');
   const pageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setFilterText(inputValue);
+      if (inputValue !== '' || activePreset !== 'All') {
+        setCurrentPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [inputValue]);
 
   const filteredAndSortedFlights = useMemo(() => {
     let result = [...flightResults];
+
+    if (activePreset === 'Top Matches') {
+      result = result.filter(f => f.status === 'verified' || f.status === 'live');
+      result.sort((a, b) => a.price - b.price);
+      return result.slice(0, 3);
+    }
+
+    if (activePreset === 'Cheapest') {
+      result.sort((a, b) => a.price - b.price);
+      return result;
+    }
+
+    if (activePreset === 'Shortest') {
+      result.sort((a, b) => a.nights - b.nights);
+      return result;
+    }
 
     if (filterText) {
       const lower = filterText.toLowerCase();
@@ -118,7 +246,7 @@ export function FlightDataTable() {
     });
 
     return result;
-  }, [flightResults, sortConfig, filterText]);
+  }, [flightResults, sortConfig, filterText, activePreset]);
 
   const totalPages = Math.ceil(filteredAndSortedFlights.length / ROWS_PER_PAGE);
   const paginatedFlights = filteredAndSortedFlights.slice(
@@ -142,14 +270,14 @@ export function FlightDataTable() {
       : <ChevronDown className="w-3 h-3 ml-1 inline" />;
   };
 
-  const getStatusColor = (yieldDelta: number) => {
+  const getStatusColor = useCallback((yieldDelta: number) => {
     if (yieldDelta < -50) return 'text-emerald-400';
     if (yieldDelta < 0) return 'text-cyan-400';
     if (yieldDelta < 50) return 'text-orange-400';
     return 'text-red-400';
-  };
+  }, []);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     const statusLower = status.toLowerCase();
 
     if (statusLower.includes('exact') || statusLower.includes('verified') || statusLower.includes('live')) {
@@ -181,50 +309,75 @@ export function FlightDataTable() {
         {status.toUpperCase()}
       </span>
     );
-  };
+  }, []);
 
-  const formatSegmentInfo = (flight: any) => {
+  const formatSegmentInfo = useCallback((flight: any) => {
     const segments = flight.metadata?.segments || 1;
     if (segments === 1) return 'Direct';
     return `${segments - 1} Stop${segments > 2 ? 's' : ''}`;
-  };
+  }, []);
 
-  const formatRoute = (flight: any) => {
+  const formatRoute = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const first = flight.outboundSegments[0];
-      return `${first.origin} → ${first.destination}`;
+      const last = flight.outboundSegments[flight.outboundSegments.length - 1];
+      return `${first.origin} → ${last.destination}`;
     }
     return 'N/A';
-  };
+  }, []);
 
-  const formatDepTime = (flight: any) => {
+  const formatOutboundDate = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
       const dep = flight.outboundSegments[0].departureTime;
-      return dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      if (dep && typeof dep === 'string') {
+        const [year, month, day] = dep.split('T')[0].split('-');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${monthNames[parseInt(month) - 1]} ${parseInt(day)}`;
+      }
+      return '--';
     }
-    return '--:--';
-  };
+    return '--';
+  }, []);
 
-  const formatArrTime = (flight: any) => {
+  const formatOutboundTime = useCallback((flight: any) => {
     if (flight.outboundSegments?.length > 0) {
-      const arr = flight.outboundSegments[0].arrivalTime;
-      return arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const first = flight.outboundSegments[0];
+      const last = flight.outboundSegments[flight.outboundSegments.length - 1];
+      const dep = first.departureTime;
+      const arr = last.arrivalTime;
+      const depTime = dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const arrTime = arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      return `${depTime}→${arrTime}`;
     }
-    return '--:--';
-  };
+    return '--:--→--:--';
+  }, []);
 
-  const handleRowClick = (flight: any) => {
-    setActiveCandidateId(activeCandidateId === flight.id ? null : flight.id);
-  };
+  const formatInboundDate = useCallback((flight: any) => {
+    const dep = flight.inboundSegments?.[0]?.departureTime;
+    if (dep && typeof dep === 'string') {
+      const [year, month, day] = dep.split('T')[0].split('-');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${monthNames[parseInt(month) - 1]} ${parseInt(day)}`;
+    }
+    return '--';
+  }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const threshold = window.innerWidth - 300;
-    setTooltipPosition({
-      x: e.clientX,
-      y: e.clientY,
-      side: e.clientX > threshold ? 'left' : 'right'
-    });
-  };
+  const formatInboundTime = useCallback((flight: any) => {
+    if (flight.inboundSegments?.length > 0) {
+      const first = flight.inboundSegments[0];
+      const last = flight.inboundSegments[flight.inboundSegments.length - 1];
+      const dep = first.departureTime;
+      const arr = last.arrivalTime;
+      const depTime = dep ? new Date(dep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      const arrTime = arr ? new Date(arr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+      return `${depTime}→${arrTime}`;
+    }
+    return '--:--→--:--';
+  }, []);
+
+  const handleRowClick = useCallback((flight: any) => {
+    setActiveCandidateId(prev => prev === flight.id ? null : flight.id);
+  }, []);
 
   const startPaging = useCallback((direction: 'prev' | 'next') => {
     if (pageIntervalRef.current) return;
@@ -252,12 +405,19 @@ export function FlightDataTable() {
   }, [stopPaging]);
 
   const verifiedCount = flightResults.filter(f => f.status === 'verified').length;
-  const fareBrand = (flight: any) => flight.metadata?.fareBrand || flight.fareBrand || 'Standard';
-  const carrierName = (code: string) => CARRIER_NAMES[code] || code;
+  const fareBrand = useCallback((flight: any) => flight.metadata?.fareBrand || flight.fareBrand || 'Standard', []);
+  const carrierName = useCallback((code: string) => CARRIER_NAMES[code] || code, []);
 
   const selectedFlight = useMemo(() => {
     return flightResults.find(f => f.id === activeCandidateId) || null;
   }, [flightResults, activeCandidateId]);
+
+  const topMatchIds = useMemo(() => {
+    const verifiedFlights = flightResults.filter(f => f.status === 'verified');
+    const sorted = [...verifiedFlights].sort((a, b) => a.price - b.price);
+    const top3 = sorted.slice(0, 3);
+    return new Set(top3.map(f => f.id));
+  }, [flightResults]);
 
   const ComparisonTable = ({ offer }: { offer: any }) => {
     const original = ticket;
@@ -332,77 +492,84 @@ export function FlightDataTable() {
 
   return (
     <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden">
-      <div className="px-3 py-2 border-b border-slate-800 flex items-center gap-3">
-        <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide shrink-0">
-          Verified Rebooking Candidates
-        </h3>
-        <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs font-bold rounded">
-          {verifiedCount}
+      <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-2">
+        <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded uppercase shrink-0">
+          {filteredAndSortedFlights.length}
         </span>
-        <div className="relative flex-1 max-w-xs ml-auto">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-          <Input
-            placeholder="Filter (e.g., 5N, A3)"
-            value={filterText}
-            onChange={(e) => { setFilterText(e.target.value); setCurrentPage(1); }}
-            className="pl-8 h-7 text-xs bg-slate-950 border-slate-800"
-          />
-          {filterText && (
+        <div className="flex items-center gap-1 shrink-0">
+          {(['All', 'Top Matches', 'Cheapest', 'Shortest'] as PresetFilter[]).map((preset) => (
             <button
-              onClick={() => setFilterText('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              key={preset}
+              onClick={() => { setActivePreset(preset); setCurrentPage(1); }}
+              className={cn(
+                'px-1.5 py-0.5 text-[8px] font-medium rounded border transition-colors',
+                activePreset === preset
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50'
+                  : 'bg-slate-900/50 text-slate-500 border-slate-800 hover:border-slate-700'
+              )}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 max-w-[120px]">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+          <Input
+            placeholder="Search..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="pl-7 h-6 text-[10px] bg-slate-950 border-slate-800"
+          />
+          {inputValue && (
+            <button
+              onClick={() => { setInputValue(''); setFilterText(''); }}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
               <X className="w-3 h-3" />
             </button>
           )}
         </div>
-        <span className="text-[10px] text-slate-500 shrink-0">
-          {filteredAndSortedFlights.length} results
-        </span>
       </div>
 
-      <div className="overflow-x-auto max-h-[400px] relative" onMouseMove={handleMouseMove}>
+      <div className="overflow-x-auto max-h-[350px] relative">
         <Table>
           <TableHeader className="sticky top-0 bg-slate-900 z-10">
             <TableRow className="border-b border-slate-800">
               <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
+                className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2"
                 onClick={() => handleSort('carrier')}
               >
                 Carrier<SortIcon columnKey="carrier" />
               </TableHead>
-              <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
-                onClick={() => handleSort('departureDate')}
-              >
-                Outbound<SortIcon columnKey="departureDate" />
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                Out Date
               </TableHead>
-              <TableHead
-                className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300"
-                onClick={() => handleSort('returnDate')}
-              >
-                Inbound<SortIcon columnKey="returnDate" />
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                Out Time
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">DEP</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">ARR</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-center">Nights</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase">Route</TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase cursor-pointer hover:text-slate-300" onClick={() => handleSort('fareBrand')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                In Date
+              </TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+                In Time
+              </TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Nights</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('fareBrand')}>
                 Brand<SortIcon columnKey="fareBrand" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-right cursor-pointer hover:text-slate-300" onClick={() => handleSort('price')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
                 Price<SortIcon columnKey="price" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase text-right cursor-pointer hover:text-slate-300" onClick={() => handleSort('yieldDelta')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('yieldDelta')}>
                 Yield<SortIcon columnKey="yieldDelta" />
               </TableHead>
-              <TableHead className="text-slate-400 font-semibold text-[10px] uppercase">Status</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedFlights.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={11} className="text-center text-slate-600 py-8">
+                <TableCell colSpan={10} className="text-center text-slate-600 py-8">
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">
@@ -415,68 +582,24 @@ export function FlightDataTable() {
               paginatedFlights.map((flight, idx) => {
                 const isOutOfRange = flight.status === 'out_of_range';
                 const isActive = activeCandidateId === flight.id;
+                const isTopMatch = topMatchIds.has(flight.id);
                 return (
-                  <TableRow
+                  <MemoizedFlightRow
                     key={flight.id}
+                    flight={flight}
+                    idx={idx}
+                    isOutOfRange={isOutOfRange}
+                    isActive={isActive}
+                    isTopMatch={isTopMatch}
                     onClick={() => handleRowClick(flight)}
-                    className={cn(
-                      'cursor-pointer transition-colors border-b border-slate-800/50',
-                      'hover:bg-slate-800/30',
-                      idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60',
-                      isOutOfRange && 'opacity-60',
-                      isActive && 'bg-blue-900/40 border-l-2 border-l-cyan-400'
-                    )}
-                  >
-                    <TableCell className={cn('font-mono font-semibold text-xs', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
-                      {flight.carrier}
-                    </TableCell>
-                    <TableCell className={cn('text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-300')}>
-                      {(flight.departureDate || '').replace('2026-', '')}
-                    </TableCell>
-                    <TableCell className={cn('text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-300')}>
-                      {(flight.returnDate || '').replace('2026-', '')}
-                    </TableCell>
-                    <TableCell className={cn('text-center font-mono text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-                      {formatDepTime(flight)}
-                    </TableCell>
-                    <TableCell className={cn('text-center font-mono text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-                      {formatArrTime(flight)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {flight.nights}N
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={cn('text-[10px]', isOutOfRange ? 'text-slate-600' : 'text-slate-400')}>
-                      {formatRoute(flight)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={fareBrand(flight) !== 'Standard' ? 'default' : 'outline'}
-                        className={cn(
-                          'text-[9px] py-0',
-                          fareBrand(flight) === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                          fareBrand(flight) === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                          fareBrand(flight) === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                          fareBrand(flight) === 'Standard' && 'text-slate-500 border-slate-600/30'
-                        )}
-                      >
-                        {fareBrand(flight)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={cn('text-right font-mono font-semibold text-xs', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
-                      ${flight.price.toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={cn('text-right font-mono font-bold text-xs', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
-                    >
-                      {flight.yieldDelta >= 0 ? '+' : ''}
-                      ${flight.yieldDelta.toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(flight.status)}
-                    </TableCell>
-                  </TableRow>
+                    fareBrand={fareBrand}
+                    formatOutboundDate={formatOutboundDate}
+                    formatOutboundTime={formatOutboundTime}
+                    formatInboundDate={formatInboundDate}
+                    formatInboundTime={formatInboundTime}
+                    getStatusColor={getStatusColor}
+                    getStatusBadge={getStatusBadge}
+                  />
                 );
               })
             )}
@@ -576,7 +699,7 @@ export function FlightDataTable() {
                   <div className="flex items-center gap-2">
                     <div className="text-center">
                       <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatDepTime(selectedFlight)}
+                        {formatOutboundTime(selectedFlight).split('→')[0]}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'}
@@ -587,7 +710,7 @@ export function FlightDataTable() {
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatArrTime(selectedFlight)}
+                        {formatOutboundTime(selectedFlight).split('→')[1]}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
@@ -595,7 +718,7 @@ export function FlightDataTable() {
                     </div>
                   </div>
                   <p className="text-center text-xs text-slate-400 mt-2">
-                    {selectedFlight.departureDate}
+                    {formatOutboundDate(selectedFlight)}
                   </p>
                 </div>
 

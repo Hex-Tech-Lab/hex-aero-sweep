@@ -1,10 +1,44 @@
 'use client';
 
 import { useTicketStore } from '@/src/store/useTicketStore';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Activity } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+
+const BIN_SIZE = 5;
+
+function binData(data: { date: string; price: number; yieldDelta: number }[], binSize: number) {
+  if (data.length === 0) return [];
+  
+  const binned: { date: string; displayDate: string; price: number; yieldDelta: number; count: number }[] = [];
+  
+  for (let i = 0; i < data.length; i += binSize) {
+    const chunk = data.slice(i, i + binSize);
+    const avgPrice = chunk.reduce((sum, d) => sum + d.price, 0) / chunk.length;
+    const avgYield = chunk.reduce((sum, d) => sum + d.yieldDelta, 0) / chunk.length;
+    const midIdx = Math.floor(chunk.length / 2);
+    const midDate = chunk[midIdx].date;
+    
+    let displayDate = midDate;
+    try {
+      displayDate = format(parseISO(midDate), 'MM-dd');
+    } catch {
+      displayDate = midDate.substring(5);
+    }
+    
+    binned.push({
+      date: midDate,
+      displayDate,
+      price: avgPrice,
+      yieldDelta: avgYield,
+      count: chunk.length,
+    });
+  }
+  
+  return binned;
+}
 
 export function VolatilityChart() {
   const { flightResults, ticket } = useTicketStore();
@@ -12,34 +46,24 @@ export function VolatilityChart() {
   const chartData = useMemo(() => {
     if (flightResults.length === 0) return [];
 
-    const verified = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
-    
-    if (verified.length === 0) {
-      return flightResults.slice(0, 500).map((flight, index) => ({
-        index,
-        date: flight.departureDate,
-        price: flight.price,
-        yieldDelta: flight.yieldDelta,
-        status: flight.status,
-      }));
-    }
+    const sorted = [...flightResults]
+      .filter(f => f.status === 'verified' && f.departureDate)
+      .filter(f => !isNaN(new Date(f.departureDate).getTime()))
+      .sort((a, b) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime());
 
-    return verified.slice(0, 500).map((flight, index) => ({
-      index,
-      date: flight.departureDate,
-      price: flight.price,
-      yieldDelta: flight.yieldDelta,
-      status: flight.status,
-    }));
+    if (sorted.length === 0) return [];
+
+    return binData(
+      sorted.map(f => ({ date: f.departureDate, price: f.price, yieldDelta: f.yieldDelta })),
+      BIN_SIZE
+    );
   }, [flightResults]);
 
   const volatilityMetrics = useMemo(() => {
-    const verified = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
-    const source = verified.length > 0 ? verified : flightResults;
+    const verifiedFlights = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
+    if (verifiedFlights.length < 2) return { stdDev: 0, priceSpan: 0, minPrice: 0, maxPrice: 0 };
     
-    if (source.length < 2) return { stdDev: 0, priceSpan: 0, minPrice: 0, maxPrice: 0 };
-    
-    const prices = source.map(f => f.price);
+    const prices = verifiedFlights.map(f => f.price);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length;
@@ -58,47 +82,26 @@ export function VolatilityChart() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className="border border-slate-800 rounded-sm bg-slate-900/50 p-3"
+      className="border border-slate-800 rounded-sm bg-slate-900/50 p-2"
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-cyan-400" />
-          <h3 className="text-[10px] font-semibold text-slate-300 uppercase tracking-wide">
-            Price Volatility
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Activity className="w-3 h-3 text-cyan-400" />
+          <h3 className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">
+            Price Trend
           </h3>
         </div>
         {chartData.length > 0 && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
-            className="flex items-center gap-2 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded text-[10px]"
-          >
-            <div className="flex items-center gap-1">
-              <span className="text-slate-500">Min</span>
-              <span className="font-mono font-bold text-emerald-400">
-                ${volatilityMetrics.minPrice.toFixed(0)}
-              </span>
-            </div>
-            <div className="w-px h-3 bg-slate-700" />
-            <div className="flex items-center gap-1">
-              <span className="text-slate-500">Max</span>
-              <span className="font-mono font-bold text-red-400">
-                ${volatilityMetrics.maxPrice.toFixed(0)}
-              </span>
-            </div>
-            <div className="w-px h-3 bg-slate-700" />
-            <div className="flex items-center gap-1">
-              <span className="text-slate-500">Span</span>
-              <span className="font-mono font-bold text-cyan-400">
-                ${volatilityMetrics.priceSpan.toFixed(0)}
-              </span>
-            </div>
-          </motion.div>
+          <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded text-[9px]">
+            <span className="text-slate-500">Span</span>
+            <span className="font-mono font-bold text-cyan-400">
+              ${volatilityMetrics.priceSpan.toFixed(0)}
+            </span>
+          </div>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={160}>
+      <ResponsiveContainer width="100%" height={140}>
         {chartData.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -106,37 +109,40 @@ export function VolatilityChart() {
             transition={{ duration: 2, repeat: Infinity }}
             className="flex flex-col items-center justify-center h-full text-slate-600"
           >
-            <Activity className="w-8 h-8 mb-1" />
-            <span className="text-[10px] uppercase tracking-wider">Awaiting Stream...</span>
+            <Activity className="w-6 h-6 mb-1" />
+            <span className="text-[9px] uppercase tracking-wider">Awaiting...</span>
           </motion.div>
         ) : (
-          <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+          <LineChart data={chartData} margin={{ top: 2, right: 5, left: -10, bottom: 2 }}>
+            <CartesianGrid strokeDasharray="2 2" stroke="#1e293b" />
             <XAxis
-              dataKey="date"
+              dataKey="displayDate"
               stroke="#475569"
-              style={{ fontSize: '8px' }}
-              angle={-45}
-              textAnchor="end"
-              height={40}
-              tickFormatter={(val) => String(val).replace('2026-', '').substring(0, 5)}
+              style={{ fontSize: '7px' }}
+              interval="preserveStartEnd"
+              label={{ value: 'Date', position: 'bottom', fill: '#64748b', fontSize: 7 }}
             />
-            <YAxis stroke="#475569" style={{ fontSize: '8px' }} domain={['auto', 'auto']} />
+            <YAxis 
+              stroke="#475569" 
+              style={{ fontSize: '7px' }} 
+              domain={['auto', 'auto']}
+              tickFormatter={(val) => `$${val.toFixed(0)}`}
+            />
             <Tooltip
               contentStyle={{
                 backgroundColor: '#0f172a',
                 border: '1px solid #334155',
                 borderRadius: '2px',
-                fontSize: '10px',
+                fontSize: '9px',
               }}
-              formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Price']}
+              formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Avg Price']}
+              labelFormatter={(label) => `${label}`}
             />
-            <Legend wrapperStyle={{ fontSize: '8px' }} />
             <Line
               type="monotone"
               dataKey="price"
               stroke="#06b6d4"
-              strokeWidth={1.5}
+              strokeWidth={2}
               dot={false}
               activeDot={{ r: 4, fill: '#06b6d4' }}
               name="Price"
@@ -147,8 +153,8 @@ export function VolatilityChart() {
                 y={ticket.baseCost}
                 stroke="#ef4444"
                 strokeWidth={1}
-                strokeDasharray="4 4"
-                label={{ value: 'Base', position: 'right', fill: '#ef4444', fontSize: 8 }}
+                strokeDasharray="3 3"
+                label={{ value: 'Base', position: 'right', fill: '#ef4444', fontSize: 6 }}
               />
             )}
           </LineChart>

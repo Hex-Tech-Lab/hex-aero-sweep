@@ -19,15 +19,18 @@ export interface LogEntry {
 interface TelemetryState {
   logs: LogEntry[];
   isVisible: boolean;
+  isExpanded: boolean;
   addLog: (log: Omit<LogEntry, 'id' | 'timestamp'>) => void;
   clearLogs: () => void;
   toggleVisibility: () => void;
   setVisibility: (visible: boolean) => void;
+  toggleExpanded: () => void;
 }
 
-export const useTelemetryStore = create<TelemetryState>((set) => ({
+export const useTelemetryStore = create<TelemetryState>()((set) => ({
   logs: [],
   isVisible: true,
+  isExpanded: false,
 
   addLog: (log) => {
     const entry: LogEntry = {
@@ -48,4 +51,6 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   toggleVisibility: () => set((state) => ({ isVisible: !state.isVisible })),
 
   setVisibility: (visible) => set({ isVisible: visible }),
+
+  toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
 }));
