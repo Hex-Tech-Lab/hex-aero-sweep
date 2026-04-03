@@ -41,6 +41,7 @@ export interface OriginalTicketData {
   origin: string;
   destination: string;
   routeLegs: Array<{ from: string; to: string }>;
+  brand?: string;
 }
 
 export type TimePreference = 'any' | 'morning' | 'afternoon' | 'evening';
@@ -124,6 +125,17 @@ function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string)
   const normalizedClass = offerBookingClass?.toUpperCase() || 'Y';
   const fareType = BOOKING_CLASS_TO_FARE[normalizedClass] || 'light';
   return AEGEAN_FARE_PENALTIES[fareType.toUpperCase() as keyof typeof AEGEAN_FARE_PENALTIES]?.totalPenalty || 90;
+}
+
+function calculateApplesToApplesPenalty(originalBrand: string, newBrand: string): number {
+  const PREMIUM_BRANDS = ['Family', 'Flex', 'Comfort'];
+  const isOriginalPremium = PREMIUM_BRANDS.some(b => originalBrand.toLowerCase().includes(b.toLowerCase()));
+  const isNewLight = newBrand.toLowerCase() === 'light';
+  
+  if (isOriginalPremium && isNewLight) {
+    return 50.00;
+  }
+  return 0.00;
 }
 
 function matchesRouteTopology(
@@ -330,6 +342,10 @@ export async function searchDuffelOffers(params: {
       const offerBookingClass = outboundSlice.fare_brand_name || offer.cabin_class || 'Y';
       const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass);
       yieldDelta += farePenalty;
+
+      const originalBrand = params.originalTicket?.brand || 'Standard';
+      const applesToApplesPenalty = calculateApplesToApplesPenalty(originalBrand, fareBrand);
+      yieldDelta += applesToApplesPenalty;
 
       const outboundSegments: FlightSegment[] = outboundSlice.segments.map((seg: any) => ({
         origin: seg.origin?.iata_code || '',

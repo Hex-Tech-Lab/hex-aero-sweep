@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 import { updateSearchLog } from '@/lib/supabase-operations';
 import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult, getHistoricPriors, batchedSearchDuffel } from '@/lib/duffel-service';
 import { UCB1, WeeklyYieldData, WeeklyRewardData, microBatch } from '@/lib/ucb1';
