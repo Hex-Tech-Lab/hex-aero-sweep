@@ -1,0 +1,91 @@
+Cabin,FareClass,BasePrice,Brand,Volatility
+Economy Flex,Y,189.99,Flex,0.15
+Economy Light,L,89.99,Light,0.12
+Economy Classic,C,129.99,Classic,0.18
+Economy Flex,Y,219.50,Flex,0.14
+Economy Light,L,79.99,Light,0.11
+Economy Classic,C,149.99,Classic,0.16
+Economy Flex,Y,175.00,Flex,0.13
+Economy Light,L,99.99,Light,0.10
+Economy Classic,C,139.99,Classic,0.17
+Business Flex,B,459.99,Business Flex,0.08
+Business Light,U,389.99,Business Light,0.09
+Business Flex,B,499.50,Business Flex,0.07
+Economy Flex,Y,199.99,Flex,0.15
+Economy Light,L,69.99,Light,0.12
+Economy Classic,C,119.99,Classic,0.19
+Economy Flex,Y,245.00,Flex,0.14
+Economy Light,L,109.99,Light,0.11
+Economy Classic,C,159.99,Classic,0.16
+Business Light,U,429.99,Business Light,0.08
+Business Flex,B,519.00,Business Flex,0.07
+Economy Flex,Y,185.50,Flex,0.13
+Economy Light,L,94.99,Light,0.10
+Economy Classic,C,134.99,Classic,0.17
+Economy Flex,Y,229.99,Flex,0.15
+Economy Light,L,84.99,Light,0.12
+Economy Classic,C,144.99,Classic,0.18
+Business Light,U,399.99,Business Light,0.09
+Business Flex,B,479.50,Business Flex,0.08
+Economy Flex,Y,169.99,Flex,0.14
+Economy Light,L,74.99,Light,0.11
+Economy Classic,C,129.99,Classic,0.16
+Economy Flex,Y,205.00,Flex,0.13
+Economy Light,L,104.99,Light,0.10
+Economy Classic,C,154.99,Classic,0.17
+Business Light,U,419.99,Business Light,0.08
+Business Flex,B,489.00,Business Flex,0.07
+Economy Flex,Y,195.50,Flex,0.15
+Economy Light,L,89.99,Light,0.12
+Economy Classic,C,139.99,Classic,0.18
+Economy Flex,Y,235.99,Flex,0.14
+Economy Light,L,99.99,Light,0.11
+Economy Classic,C,149.99,Classic,0.16
+Business Light,U,439.99,Business Light,0.09
+Business Flex,B,509.50,Business Flex,0.08
+Economy Flex,Y,179.99,Flex,0.13
+Economy Light,L,79.99,Light,0.10
+Economy Classic,C,134.99,Classic,0.17
+Economy Flex,Y,215.00,Flex,0.15
+Economy Light,L,94.99,Light,0.12
+Economy Classic,C,144.99,Classic,0.18
+Business Flex,B,469.99,Business Flex,0.07
+Economy Flex,Y,189.50,Flex,0.14
+Economy Light,L,84.99,Light,0.11
+Economy Classic,C,129.99,Classic,0.16
+Economy Flex,Y,225.99,Flex,0.13
+Economy Light,L,109.99,Light,0.10
+Economy Classic,C,159.99,Classic,0.17
+Business Light,U,409.99,Business Light,0.08
+Business Flex,B,499.00,Business Flex,0.07
+Economy Flex,Y,199.99,Flex,0.15
+Economy Light,L,89.99,Light,0.12
+Economy Classic,C,139.99,Classic,0.18
+Economy Flex,Y,239.50,Flex,0.14
+Economy Light,L,104.99,Light,0.11
+Economy Classic,C,154.99,Classic,0.16
+Business Light,U,449.99,Business Light,0.09
+Business Flex,B,529.00,Business Flex,0.08
+Economy Flex,Y,174.99,Flex,0.13
+Economy Light,L,74.99,Light,0.10
+Economy Classic,C,124.99,Classic,0.17
+Economy Flex,Y,210.00,Flex,0.15
+Economy Light,L,99.99,Light,0.12
+Economy Classic,C,149.99,Classic,0.18
+Business Flex,B,459.50,Business Flex,0.07
+Economy Flex,Y,184.50,Flex,0.14
+Economy Light,L,79.99,Light,0.11
+Economy Classic,C,134.99,Classic,0.16
+Economy Flex,Y,220.99,Flex,0.13
+Economy Light,L,109.99,Light,0.10
+Economy Classic,C,159.99,Classic,0.17
+Business Light,U,429.99,Business Light,0.08
+Business Flex,B,509.00,Business Flex,0.07
+Economy Flex,Y,194.99,Flex,0.15
+Economy Light,L,94.99,Light,0.12
+Economy Classic,C,144.99,Classic,0.18
+Economy Flex,Y,234.50,Flex,0.14
+Economy Light,L,99.99,Light,0.11
+Economy Classic,C,149.99,Classic,0.16
+Business Light,U,439.99,Business Light,0.09
+Business Flex,B,519.50,Business Flex,0.08

@@ -1,0 +1,632 @@
+[
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 189.99,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 89.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 129.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 219.5,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 79.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 149.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 175,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 99.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 139.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 459.99,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 389.99,
+    "volatility_index": 0.09
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 499.5,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 199.99,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 69.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 119.99,
+    "volatility_index": 0.19
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 245,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 109.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 159.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 429.99,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 519,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 185.5,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 94.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 134.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 229.99,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 84.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 144.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 399.99,
+    "volatility_index": 0.09
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 479.5,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 169.99,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 74.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 129.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 205,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 104.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 154.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 419.99,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 489,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 195.5,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 89.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 139.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 235.99,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 99.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 149.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 439.99,
+    "volatility_index": 0.09
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 509.5,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 179.99,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 79.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 134.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 215,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 94.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 144.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 469.99,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 189.5,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 84.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 129.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 225.99,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 109.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 159.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 409.99,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 499,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 199.99,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 89.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 139.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 239.5,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 104.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 154.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 449.99,
+    "volatility_index": 0.09
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 529,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 174.99,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 74.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 124.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 210,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 99.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 149.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 459.5,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 184.5,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 79.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 134.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 220.99,
+    "volatility_index": 0.13
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 109.99,
+    "volatility_index": 0.1
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 159.99,
+    "volatility_index": 0.17
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 429.99,
+    "volatility_index": 0.08
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 509,
+    "volatility_index": 0.07
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 194.99,
+    "volatility_index": 0.15
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 94.99,
+    "volatility_index": 0.12
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 144.99,
+    "volatility_index": 0.18
+  },
+  {
+    "cabin": "Economy Flex",
+    "brand": "Flex",
+    "class": "Y",
+    "historical_price": 234.5,
+    "volatility_index": 0.14
+  },
+  {
+    "cabin": "Economy Light",
+    "brand": "Light",
+    "class": "L",
+    "historical_price": 99.99,
+    "volatility_index": 0.11
+  },
+  {
+    "cabin": "Economy Classic",
+    "brand": "Classic",
+    "class": "C",
+    "historical_price": 149.99,
+    "volatility_index": 0.16
+  },
+  {
+    "cabin": "Business Light",
+    "brand": "Business Light",
+    "class": "U",
+    "historical_price": 439.99,
+    "volatility_index": 0.09
+  },
+  {
+    "cabin": "Business Flex",
+    "brand": "Business Flex",
+    "class": "B",
+    "historical_price": 519.5,
+    "volatility_index": 0.08
+  }
+]

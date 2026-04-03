@@ -42,7 +42,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col pb-0">
+    <div className="min-h-screen bg-slate-950 flex flex-col pb-0 max-w-[100vw] overflow-x-hidden">
       <GlobalHeader
         currentStep={currentStep}
         onBack={() => setCurrentStep(Math.max(1, currentStep - 1))}

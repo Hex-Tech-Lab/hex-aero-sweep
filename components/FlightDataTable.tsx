@@ -429,77 +429,6 @@ export function FlightDataTable() {
     return new Set(top3.map(f => f.id));
   }, [flightResults]);
 
-  const ComparisonTable = ({ offer }: { offer: any }) => {
-    const original = ticket;
-    const offerData = {
-      price: offer.price,
-      fareClass: offer.metadata?.fareBrand || offer.fareBrand || 'Standard',
-      origin: offer.outboundSegments?.[0]?.origin || 'N/A',
-      destination: offer.outboundSegments?.[0]?.destination || 'N/A',
-      nights: offer.nights,
-    };
-
-    const comparisonRows = [
-      { label: 'Price', original: `$${original.baseCost?.toFixed(2) || '792.87'}`, offer: `$${offerData.price.toFixed(2)}`, diff: offer.yieldDelta },
-      { label: 'Fare Brand', original: original.fareClass || 'Economy', offer: offerData.fareClass, diff: null },
-      { label: 'Route', original: 'CAI → ATH', offer: `${offerData.origin} → ${offerData.destination}`, diff: null },
-      { label: 'Duration', original: 'Flexible', offer: `${offerData.nights} nights`, diff: null },
-    ];
-
-    return (
-      <div className="mt-6 p-4 bg-slate-900 border border-slate-700 rounded-sm">
-        <p className="text-xs text-cyan-400 uppercase mb-3 font-semibold tracking-wider">Ticket Comparison</p>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-slate-700">
-              <TableHead className="text-slate-400 text-xs">Attribute</TableHead>
-              <TableHead className="text-slate-400 text-xs text-center">Original Ticket</TableHead>
-              <TableHead className="text-slate-400 text-xs text-center">Provider Offer</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {comparisonRows.map((row) => (
-              <TableRow key={row.label} className="border-slate-800">
-                <TableCell className="text-slate-300 text-sm font-medium">{row.label}</TableCell>
-                <TableCell className="text-center text-slate-400 text-sm font-mono">{row.original}</TableCell>
-                <TableCell className="text-center text-sm">
-                  <span className={cn('font-mono', row.diff !== null && (row.diff < 0 ? 'text-emerald-400' : 'text-red-400'))}>
-                    {row.offer}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  };
-
-  const DetailedComparison = () => {
-    const sf = selectedFlight as FlightWithSegments | null;
-    return (
-    <pre className="mt-4 p-4 bg-black border border-slate-700 rounded text-[10px] font-mono text-slate-400 overflow-x-auto">
-{`╔══════════════════════════════════════════════════════════════════════════════╗
-║                         TICKET PARAMETER COMPARISON                            ║
-╠════════════════════════════╦══════════════════════════╦═════════════════════════╣
-║ PARAMETER                  ║ ORIGINAL TICKET          ║ NEW OFFER               ║
-╠════════════════════════════╬══════════════════════════╬═════════════════════════╣
-║ Ticket Number              ║ ${(ticket as any).ticketNumber || 'N/A'.padEnd(24)}║ ${sf?.carrier || 'N/A'.padEnd(25)}║
-║ Route                      ║ CAI → ATH                ║ ${sf?.outboundSegments?.[0]?.origin || 'N/A'} → ${sf?.outboundSegments?.[0]?.destination || 'N/A'.padEnd(18)}║
-║ Departure Date             ║ ${(ticket as any).departureDate || 'N/A'.padEnd(24)}║ ${(sf?.departureDate || 'N/A').padEnd(25)}║
-║ Return Date                ║ ${(ticket as any).returnDate || 'N/A'.padEnd(24)}║ ${(sf?.returnDate || 'N/A').padEnd(25)}║
-║ Base Fare                  ║ $${(ticket.baseCost || 792.87).toFixed(2).padEnd(22)}║ $${(sf?.price || 0).toFixed(2).padEnd(24)}║
-║ Fare Brand                 ║ ${(ticket.fareClass || 'Economy').padEnd(24)}║ ${(fareBrand(sf as any) || 'Standard').padEnd(25)}║
-║ Passenger Count            ║ ${(ticket.passengers?.length || 1).toString().padEnd(24)}║ ${(ticket.passengers?.length || 1).toString().padEnd(25)}║
-║ Booking Class              ║ ${((ticket as any).bookingClass || 'Y').padEnd(24)}║ ${(sf?.metadata?.bookingClass || 'Y').padEnd(25)}║
-║ Direct Flight Only         ║ ${((ticket as any).directFlightOnly ? 'Yes' : 'No').padEnd(24)}║ ${(sf?.metadata?.segments === 1 ? 'Yes' : 'No').padEnd(25)}║
-╠════════════════════════════╬══════════════════════════╬═════════════════════════╣
-║ YIELD DELTA                ║                          ║ $${(sf?.yieldDelta || 0) >= 0 ? '+' : ''}${(sf?.yieldDelta || 0).toFixed(2).padEnd(22)}║
-╚════════════════════════════╩══════════════════════════╩═════════════════════════╝`}
-    </pre>
-  );
-};
-
   return (
     <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden">
       <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-2">
@@ -673,171 +602,141 @@ export function FlightDataTable() {
       )}
 
       <Sheet open={!!selectedFlight} onOpenChange={() => setActiveCandidateId(null)}>
-        <SheetContent className="fixed right-0 top-0 h-full w-[1200px] shadow-2xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto">
+        <SheetContent className="w-full h-full max-h-[85vh] sm:max-w-md md:max-w-lg fixed bottom-0 sm:right-0 sm:top-0 z-50 overflow-y-auto bg-slate-900 border-t sm:border-l border-slate-800">
           {selectedFlight && (
-            <>
-              <div className="pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-cyan-500/20 rounded">
-                    <Plane className="w-8 h-8 text-cyan-400" />
+            <div className="p-4 space-y-4 overflow-x-hidden">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                <div className="p-2 bg-cyan-500/20 rounded shrink-0">
+                  <Plane className="w-6 h-6 text-cyan-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-bold text-slate-100 truncate">
+                      {selectedFlight.carrier}
+                    </h2>
+                    <Badge
+                      className={cn(
+                        'text-xs shrink-0',
+                        fareBrand(selectedFlight) === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                        fareBrand(selectedFlight) === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                        fareBrand(selectedFlight) === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                        fareBrand(selectedFlight) === 'Standard' && 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                      )}
+                    >
+                      {fareBrand(selectedFlight)}
+                    </Badge>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-bold text-slate-100">
-                        {selectedFlight.carrier}
-                      </h2>
-                      <span className="text-xs text-slate-500">{carrierName(selectedFlight.carrier)}</span>
-                      <Badge
-                        className={cn(
-                          'text-sm',
-                          fareBrand(selectedFlight) === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                          fareBrand(selectedFlight) === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                          fareBrand(selectedFlight) === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                          fareBrand(selectedFlight) === 'Standard' && 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                        )}
-                      >
-                        {fareBrand(selectedFlight)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-slate-500 uppercase tracking-wide mt-1">
-                      Rebooking Candidate
-                    </p>
+                  <p className="text-xs text-slate-500 truncate">{carrierName(selectedFlight.carrier)}</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 border border-slate-800 rounded-sm overflow-hidden">
+                <div className="px-3 py-2 bg-slate-900/50 border-b border-slate-800">
+                  <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Comparison Matrix</p>
+                </div>
+                <div className="divide-y divide-slate-800 text-sm">
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2">
+                    <span className="text-slate-500 text-xs">Attribute</span>
+                    <span className="text-slate-400 text-xs text-center">Original</span>
+                    <span className="text-slate-400 text-xs text-center">Offer</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
+                    <span className="text-slate-400 text-xs">Price</span>
+                    <span className="text-slate-300 text-xs font-mono text-center truncate">${(ticket.baseCost || 792.87).toFixed(2)}</span>
+                    <span className={cn('text-xs font-mono text-center font-semibold truncate', selectedFlight.yieldDelta < 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      ${selectedFlight.price.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
+                    <span className="text-slate-400 text-xs">Fare Brand</span>
+                    <span className="text-slate-300 text-xs font-mono text-center truncate">{ticket.fareClass || 'Economy'}</span>
+                    <span className={cn('text-xs font-mono text-center truncate', fareBrand(selectedFlight) === 'Light' ? 'text-amber-400' : 'text-slate-300')}>
+                      {fareBrand(selectedFlight)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
+                    <span className="text-slate-400 text-xs">Routing</span>
+                    <span className="text-slate-300 text-xs font-mono text-center truncate">CAI → ATH</span>
+                    <span className="text-slate-300 text-xs font-mono text-center truncate">
+                      {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'} → {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
+                    <span className="text-slate-400 text-xs">Baggage</span>
+                    <span className="text-slate-300 text-xs font-mono text-center">1 PC</span>
+                    <span className={cn('text-xs font-mono text-center truncate', selectedFlight.metadata?.baggage === '0 PC' ? 'text-red-400' : 'text-slate-300')}>
+                      {selectedFlight.metadata?.baggage || '1 PC'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
+                    <span className="text-slate-400 text-xs">Booking Class</span>
+                    <span className="text-slate-300 text-xs font-mono text-center">{(ticket as any).bookingClass || 'Y'}</span>
+                    <span className="text-slate-300 text-xs font-mono text-center">{selectedFlight.metadata?.bookingClass || 'Y'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center bg-slate-900/50">
+                    <span className="text-slate-400 text-xs font-semibold">Yield Delta</span>
+                    <span className="text-slate-500 text-xs text-center">—</span>
+                    <span className={cn('text-xs font-mono text-center font-bold truncate', getStatusColor(selectedFlight.yieldDelta))}>
+                      {selectedFlight.yieldDelta >= 0 ? '+' : ''}${selectedFlight.yieldDelta.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                  <p className="text-[10px] text-cyan-400 uppercase mb-2 font-semibold tracking-wider">Outbound</p>
-                  <div className="flex items-center gap-2">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatOutboundTime(selectedFlight).split('→')[0]}
-                      </p>
-                      <p className="text-[10px] text-slate-500">
-                        {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                      <ArrowRight className="w-4 h-4 text-cyan-400" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-slate-100 font-mono">
-                        {formatOutboundTime(selectedFlight).split('→')[1]}
-                      </p>
-                      <p className="text-[10px] text-slate-500">
-                        {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
-                      </p>
-                    </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-slate-950 border border-slate-800 rounded-sm p-3">
+                  <p className="text-[10px] text-cyan-400 uppercase mb-1 font-semibold tracking-wider">Outbound</p>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-sm font-mono font-bold text-slate-100 truncate">
+                      {formatOutboundTime(selectedFlight).split('→')[0]}
+                    </span>
+                    <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                    <span className="text-sm font-mono font-bold text-slate-100 truncate">
+                      {formatOutboundTime(selectedFlight).split('→')[1]}
+                    </span>
                   </div>
-                  <p className="text-center text-xs text-slate-400 mt-2">
-                    {formatOutboundDate(selectedFlight)}
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">
+                    {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'} → {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
                   </p>
+                  <p className="text-xs text-slate-400 mt-1">{formatOutboundDate(selectedFlight)}</p>
                 </div>
 
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                  <p className="text-[10px] text-cyan-400 uppercase mb-2 font-semibold tracking-wider">Return</p>
-                  <div className="text-center py-2">
-                    <p className="text-lg font-bold text-slate-100 font-mono">
-                      {selectedFlight.returnDate}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      {selectedFlight.nights} nights
-                    </p>
-                  </div>
-                </div>
-
-                <div className="col-span-2 p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                  <p className="text-[10px] text-slate-500 uppercase mb-2 font-semibold tracking-wider">Pricing</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase">Total</p>
-                      <p className="text-2xl font-bold text-slate-100 font-mono">
-                        ${selectedFlight.price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase">Delta</p>
-                      <p className={cn('text-2xl font-bold font-mono', getStatusColor(selectedFlight.yieldDelta))}>
-                        {selectedFlight.yieldDelta >= 0 ? '+' : ''}${selectedFlight.yieldDelta.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase">
-                        {selectedFlight.yieldDelta < 0 ? 'Savings' : 'Premium'}
-                      </p>
-                      <p className={cn('text-xl font-bold font-mono', selectedFlight.yieldDelta < 0 ? 'text-emerald-400' : 'text-red-400')}>
-                        ${Math.abs(selectedFlight.yieldDelta).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2 p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                  <p className="text-[10px] text-slate-500 uppercase mb-2 font-semibold tracking-wider">Details</p>
-                  <div className="grid grid-cols-4 gap-2 text-[10px]">
-                    <div>
-                      <span className="text-slate-500">Segments:</span>
-                      <span className="ml-1 text-slate-300">{formatSegmentInfo(selectedFlight)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Class:</span>
-                      <span className="ml-1 text-slate-300 font-mono">{selectedFlight.metadata?.bookingClass || 'Y'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Aircraft:</span>
-                      <span className="ml-1 text-slate-300">{selectedFlight.metadata?.aircraft || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Baggage:</span>
-                      <span className="ml-1 text-slate-300">{selectedFlight.metadata?.baggage || '1 PC'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Terminal:</span>
-                      <span className="ml-1 text-slate-300">{(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.terminal || 'T1'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Duration:</span>
-                      <span className="ml-1 text-slate-300">{selectedFlight.nights}N</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Status:</span>
-                      <span className="ml-1">{getStatusBadge(selectedFlight.status)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Provider:</span>
-                      <span className="ml-1 text-slate-300">Provider 1</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2 p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                  <p className="text-[10px] text-slate-500 uppercase mb-2 font-semibold tracking-wider">Segment Details</p>
-                  {((selectedFlight as FlightWithSegments).outboundSegments || []).map((seg: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-[10px] py-1 border-b border-slate-800 last:border-0">
-                      <span className="text-cyan-400 font-mono w-6">{seg.origin}</span>
-                      <span className="text-slate-600">→</span>
-                      <span className="text-cyan-400 font-mono w-6">{seg.destination}</span>
-                      <span className="text-slate-500 ml-2">{new Date(seg.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span className="text-slate-600">→</span>
-                      <span className="text-slate-500">{new Date(seg.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span className="ml-auto text-slate-400">{seg.terminal ? `T${seg.terminal}` : ''}</span>
-                    </div>
-                  ))}
+                <div className="bg-slate-950 border border-slate-800 rounded-sm p-3">
+                  <p className="text-[10px] text-cyan-400 uppercase mb-1 font-semibold tracking-wider">Return</p>
+                  <p className="text-sm font-mono font-bold text-slate-100 truncate">
+                    {selectedFlight.returnDate}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">{selectedFlight.nights} nights</p>
                 </div>
               </div>
 
-              <ComparisonTable offer={selectedFlight} />
-              <DetailedComparison />
-
-              <div className="mt-4 p-3 bg-slate-900 border border-slate-800 rounded-sm">
-                <p className="text-[10px] text-slate-500 uppercase mb-2 font-semibold tracking-wider">Discovery</p>
-                <Badge variant="outline" className="uppercase text-xs">
-                  <Clock className="w-3 h-3 mr-2" />
-                  {selectedFlight.metadata?.phase || selectedFlight.status}
-                </Badge>
+              <div className="bg-slate-950 border border-slate-800 rounded-sm p-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase">Total</p>
+                    <p className="text-lg font-bold text-slate-100 font-mono truncate">${selectedFlight.price.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase">{selectedFlight.yieldDelta < 0 ? 'Savings' : 'Premium'}</p>
+                    <p className={cn('text-lg font-bold font-mono truncate', selectedFlight.yieldDelta < 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      ${Math.abs(selectedFlight.yieldDelta).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase">Segments</p>
+                    <p className="text-lg font-bold text-slate-300">{formatSegmentInfo(selectedFlight)}</p>
+                  </div>
+                </div>
               </div>
-            </>
+
+              <div className="flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-sm p-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span className="text-xs text-slate-400 truncate">{selectedFlight.metadata?.phase || selectedFlight.status}</span>
+                </div>
+                {getStatusBadge(selectedFlight.status)}
+              </div>
+            </div>
           )}
         </SheetContent>
       </Sheet>

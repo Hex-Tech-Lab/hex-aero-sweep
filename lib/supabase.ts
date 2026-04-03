@@ -1,13 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || process.env.SUPABASE_ANON_KEY || '';
 
+let supabase: SupabaseClient;
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("⚠️ Missing Supabase environment variables during build.");
+  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key');
+} else {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export { supabase };
 
 export type SearchLog = {
   id: string;

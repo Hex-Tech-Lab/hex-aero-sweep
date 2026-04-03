@@ -85,11 +85,11 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const bottomPadding = telemetryVisible ? 'mb-48' : 'mb-20';
 
   return (
-    <div className="w-full px-4 py-2 space-y-2">
-      <div className="grid grid-cols-7 gap-1.5">
+    <div className="w-full px-4 py-2 space-y-2 max-w-[100vw] overflow-x-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 w-full">
         <MetricBox
           label="Est. Volume"
-          value={estVolume.toLocaleString()}
+          value={Math.min(estVolume, 99999).toLocaleString()}
           subValue="Max API × 1200"
           variant="info"
           icon={Activity}
@@ -102,33 +102,33 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="Total Scanned"
-          value={totalScanned.toLocaleString()}
+          value={Math.min(totalScanned, 99999).toLocaleString()}
           variant="default"
           icon={Activity}
         />
         <MetricBox
           label="Out of Range"
-          value={outOfRange.toLocaleString()}
+          value={Math.min(outOfRange, 9999).toLocaleString()}
           variant="error"
           icon={XCircle}
         />
         <MetricBox
-          label="Valid Candidates"
-          value={validCandidates.toLocaleString()}
+          label="Valid"
+          value={Math.min(validCandidates, 9999).toLocaleString()}
           variant="success"
           icon={CheckCircle2}
         />
         <MetricBox
-          label="Top Matches"
+          label="Matches"
           value={metricsData.count}
-          subValue="Verified"
+          subValue="Top"
           variant="success"
           icon={Star}
         />
         <MetricBox
           label="Best Yield"
           value={metricsData.display}
-          subValue={metricsData.isNegative ? 'Savings available' : 'Best option found'}
+          subValue={metricsData.isNegative ? '↓ Save' : '↑ Best'}
           variant={metricsData.isNegative ? 'success' : 'warning'}
           icon={metricsData.isNegative ? TrendingDown : TrendingUp}
         />
