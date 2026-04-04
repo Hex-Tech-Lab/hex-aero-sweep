@@ -98,20 +98,20 @@ export function VolatilityChart() {
       
       {chartData.length > 0 && (
         <div className="grid grid-cols-4 gap-1 mb-1 px-1">
-          <div className="text-center">
+          <div className="text-center" title="Highest price in dataset">
             <div className="text-[8px] text-slate-500 uppercase">Max</div>
             <div className="text-[9px] font-mono text-red-400">${volatilityMetrics.maxPrice.toFixed(0)}</div>
           </div>
-          <div className="text-center">
+          <div className="text-center" title="Middle value of all valid prices">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Med</div>
+            <div className="text-[9px] font-mono text-slate-300">${volatilityMetrics.medianPrice.toFixed(0)}</div>
+          </div>
+          <div className="text-center" title="Lowest price in dataset">
             <div className="text-[8px] text-slate-500 uppercase">Min</div>
             <div className="text-[9px] font-mono text-emerald-400">${volatilityMetrics.minPrice.toFixed(0)}</div>
           </div>
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Med</div>
-            <div className="text-[9px] font-mono text-slate-300">${volatilityMetrics.medianPrice.toFixed(0)}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Vol%</div>
+          <div className="text-center" title="Standard Deviation / Mean (Price instability)">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Vol%</div>
             <div className="text-[9px] font-mono text-amber-400">{volatilityMetrics.volatility.toFixed(1)}%</div>
           </div>
         </div>

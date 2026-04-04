@@ -77,20 +77,20 @@ export function HeuristicPathChart() {
       
       {chartData.length > 0 && (
         <div className="grid grid-cols-4 gap-1 mb-1 px-1">
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Best</div>
+          <div className="text-center" title="Lowest yield delta (best savings)">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Best</div>
             <div className="text-[9px] font-mono text-emerald-400">${Math.abs(stats.bestYield).toFixed(0)}</div>
           </div>
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Days</div>
+          <div className="text-center" title="Nights for best yield">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Days</div>
             <div className="text-[9px] font-mono text-slate-300">{stats.bestNights}N</div>
           </div>
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Savings</div>
+          <div className="text-center" title="Days with significant savings (>$20)">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Savings</div>
             <div className="text-[9px] font-mono text-emerald-400">{stats.savings}</div>
           </div>
-          <div className="text-center">
-            <div className="text-[8px] text-slate-500 uppercase">Premium</div>
+          <div className="text-center" title="Days with significant premium (>$20)">
+            <div className="text-[8px] text-slate-500 uppercase cursor-help">Premium</div>
             <div className="text-[9px] font-mono text-red-400">{stats.premium}</div>
           </div>
         </div>

@@ -49,6 +49,40 @@ function generateAdjacentDates(centerDate: Date, spreadDays: number = 2): Date[]
   return dates.sort((a, b) => a.getTime() - b.getTime());
 }
 
+function chunkArray<T>(array: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+}
+
+async function processInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  processor: (item: T) => Promise<R>,
+  onChunkComplete?: (results: R[], chunkIndex: number) => void,
+  flushCallback?: () => void
+): Promise<R[]> {
+  const chunks = chunkArray(items, chunkSize);
+  const results: R[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkResults = await Promise.all(chunks[i].map(processor));
+    results.push(...chunkResults);
+    
+    if (onChunkComplete) {
+      onChunkComplete(chunkResults, i);
+    }
+    
+    if (flushCallback) {
+      flushCallback();
+    }
+    
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  return results;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
@@ -262,6 +296,7 @@ export async function GET(request: NextRequest) {
             totalScanned += rawOffersCount;
             outOfRange += rejectedCount;
 
+            const maxAcceptablePrice = baseCost + priceTolerance;
             let bestPrice = Infinity;
             for (const candidate of candidates) {
               const candidateKey = getCandidateKey(candidate);
@@ -270,8 +305,8 @@ export async function GET(request: NextRequest) {
               }
               seenCandidates.set(candidateKey, true);
               
-              if (candidate.yieldDelta >= priceTolerance) {
-                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
+              if (candidate.price > maxAcceptablePrice) {
+                sendLog('info', `[CEILING] ${candidate.departureDate}: $${candidate.price.toFixed(2)} exceeds max $${maxAcceptablePrice.toFixed(2)}`);
                 continue;
               }
               
@@ -360,7 +395,6 @@ export async function GET(request: NextRequest) {
 
         const chunkedSearches = exploitSearches.slice(0, phase3Budget);
 
-        let exploitIndex = 0;
         const filteredSearches = chunkedSearches.filter(s => {
           const sig = getSearchSignature(s.departureDate, s.returnDate);
           if (searchedSignatures.has(sig)) {
@@ -370,57 +404,66 @@ export async function GET(request: NextRequest) {
           return true;
         });
 
-        for (const search of filteredSearches) {
+        const maxAcceptablePrice = baseCost + priceTolerance;
+        
+        let exploitIndex = 0;
+        const chunks = chunkArray(filteredSearches, 3);
+        
+        for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
           if (totalApiCalls >= maxApiCalls) break;
           
-          const idx = exploitIndex++;
-          sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
+          const chunk = chunks[chunkIdx];
+          const chunkStart = exploitIndex;
+          
+          await Promise.all(chunk.map(async (search) => {
+            const idx = exploitIndex++;
+            sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
+            totalApiCalls++;
 
-          totalApiCalls++;
+            try {
+              const result = await searchDuffelOffers({
+                origin,
+                destination,
+                departureDate: search.departureDate,
+                returnDate: search.returnDate,
+                passengers: passengerCount,
+                cabinClass,
+                originalTicket: originalTicketData,
+                baseCost,
+                preferences: {
+                  directFlightOnly,
+                  outboundTimePreference: outboundTimePreference as any,
+                  inboundTimePreference: inboundTimePreference as any,
+                  passengerBreakdown,
+                },
+              });
 
-          try {
-            const result = await searchDuffelOffers({
-              origin,
-              destination,
-              departureDate: search.departureDate,
-              returnDate: search.returnDate,
-              passengers: passengerCount,
-              cabinClass,
-              originalTicket: originalTicketData,
-              baseCost,
-              preferences: {
-                directFlightOnly,
-                outboundTimePreference: outboundTimePreference as any,
-                inboundTimePreference: inboundTimePreference as any,
-                passengerBreakdown,
-              },
-            });
+              totalScanned += result.rawOffersCount;
+              outOfRange += result.rejectedCount;
 
-            totalScanned += result.rawOffersCount;
-            outOfRange += result.rejectedCount;
-
-            for (const candidate of result.candidates) {
-              const candidateKey = getCandidateKey(candidate);
-              if (seenCandidates.has(candidateKey)) continue;
-              seenCandidates.set(candidateKey, true);
-              
-              if (candidate.yieldDelta >= priceTolerance) {
-                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
-                continue;
+              for (const candidate of result.candidates) {
+                const candidateKey = getCandidateKey(candidate);
+                if (seenCandidates.has(candidateKey)) continue;
+                seenCandidates.set(candidateKey, true);
+                
+                if (candidate.price > maxAcceptablePrice) {
+                  sendLog('info', `[CEILING] ${candidate.departureDate}: $${candidate.price.toFixed(2)} exceeds max $${maxAcceptablePrice.toFixed(2)}`);
+                  continue;
+                }
+                
+                if (candidate.status === 'verified') {
+                  candidatesFound++;
+                  sendLog('success', `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`);
+                }
+                sendMessage({ type: 'candidate', data: candidate });
               }
-              
-              if (candidate.status === 'verified') {
-                candidatesFound++;
-                sendLog('success', `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`);
-              }
-              sendMessage({ type: 'candidate', data: candidate });
+            } catch (err) {
+              sendLog('error', `[EXPLOIT ERROR] ${search.departureDate}: ${err instanceof Error ? err.message : 'Unknown'}`);
             }
-          } catch (err) {
-            sendLog('error', `[EXPLOIT ERROR] ${search.departureDate}: ${err instanceof Error ? err.message : 'Unknown'}`);
-          }
+          }));
 
           sendMetrics('PHASE 3');
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 100));
         }
 
         sendLog('info', `${PHASE_LABELS.POLISH} Polish phase: ${phase4Budget} calls for time-window permutations`);
@@ -450,6 +493,7 @@ export async function GET(request: NextRequest) {
           return true;
         });
 
+        const polishMaxAcceptablePrice = baseCost + priceTolerance;
         for (const search of filteredPolishSearches) {
           if (polishIndex >= phase4Budget || totalApiCalls >= maxApiCalls) break;
 
@@ -485,8 +529,8 @@ export async function GET(request: NextRequest) {
               }
               seenCandidates.set(candidateKey, true);
               
-              if (candidate.yieldDelta >= priceTolerance) {
-                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
+              if (candidate.price > polishMaxAcceptablePrice) {
+                sendLog('info', `[CEILING] ${candidate.departureDate}: $${candidate.price.toFixed(2)} exceeds max $${polishMaxAcceptablePrice.toFixed(2)}`);
                 continue;
               }
               
@@ -502,10 +546,8 @@ export async function GET(request: NextRequest) {
           }
 
           polishIndex++;
-          await new Promise(r => setTimeout(r, 200));
           sendMetrics('PHASE 4');
-
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise(r => setTimeout(r, 200));
         }
 
         const armStats = ucb1.getArmStats();
