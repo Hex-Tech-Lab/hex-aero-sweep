@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 import { updateSearchLog } from '@/lib/supabase-operations';
 import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult, getHistoricPriors } from '@/lib/duffel-service';
 import { UCB1, WeeklyYieldData, WeeklyRewardData, microBatch } from '@/lib/ucb1';
@@ -418,9 +419,9 @@ export async function GET(request: NextRequest) {
           await Promise.all(chunk.map(async (search) => {
             const idx = exploitIndex++;
             sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
-            totalApiCalls++;
 
             try {
+              totalApiCalls++;
               const result = await searchDuffelOffers({
                 origin,
                 destination,
@@ -458,7 +459,9 @@ export async function GET(request: NextRequest) {
                 sendMessage({ type: 'candidate', data: candidate });
               }
             } catch (err) {
-              sendLog('error', `[EXPLOIT ERROR] ${search.departureDate}: ${err instanceof Error ? err.message : 'Unknown'}`);
+              totalApiCalls--;
+              sendLog('warn', `[TIMEOUT] Skipping ${search.departureDate}: ${err instanceof Error ? err.message : 'Unknown'}`);
+              return;
             }
           }));
 

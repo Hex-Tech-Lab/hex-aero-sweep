@@ -1,7 +1,6 @@
 'use client';
 
 import { useTicketStore } from '@/src/store/useTicketStore';
-import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,6 @@ const MAX_BUFFER_SIZE = 500;
 
 export function TerminalOutput() {
   const { logs, clearLogs } = useTicketStore();
-  const { isVisible: telemetryVisible } = useTelemetryStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const bufferedLogs = logs.length > MAX_BUFFER_SIZE ? logs.slice(-MAX_BUFFER_SIZE) : logs;
@@ -29,10 +27,8 @@ export function TerminalOutput() {
     error: 'text-red-400',
   };
 
-  const heightClass = telemetryVisible ? 'h-44' : 'h-40';
-
   return (
-    <div className={cn("flex flex-col overflow-hidden bg-slate-950", heightClass)}>
+    <div className="flex flex-col h-full bg-slate-950 min-h-0">
       <div className="flex items-center justify-between p-1.5 border-b border-slate-800 shrink-0 bg-slate-950">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -57,7 +53,7 @@ export function TerminalOutput() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex flex-col max-h-64 overflow-y-auto overscroll-contain p-1 bg-slate-950 scroll-smooth">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain p-1 bg-slate-950 scroll-smooth min-h-0">
         {bufferedLogs.length === 0 ? (
           <div className="text-slate-700 text-center py-2 text-[9px] uppercase tracking-wider font-mono">
             READY...

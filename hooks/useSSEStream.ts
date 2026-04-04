@@ -123,9 +123,13 @@ export function useSSEStream() {
         switch (message.type) {
           case 'metrics':
             metricsBufferRef.current = {
-              totalScanned: message.data.totalScanned,
-              candidatesFound: message.data.candidatesFound,
-              outOfRange: message.data.outOfRange,
+              totalScanned: message.data.totalScanned ?? 0,
+              candidatesFound: message.data.candidatesFound ?? 0,
+              outOfRange: message.data.outOfRange ?? 0,
+              apiCallsMade: message.data.apiCallsMade ?? 0,
+              maxApiCalls: message.data.maxApiCalls ?? 0,
+              progress: message.data.progress ?? '0/0',
+              skippedDuplicates: message.data.skippedDuplicates ?? 0,
             };
             break;
 

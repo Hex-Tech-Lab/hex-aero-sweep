@@ -43,6 +43,9 @@ export type ExecutionMetrics = {
   outOfRange: number;
   status: 'idle' | 'running' | 'completed' | 'error' | 'aborted';
   progress?: string;
+  apiCallsMade?: number;
+  maxApiCalls?: number;
+  skippedDuplicates?: number;
 };
 
 export type TerminalLog = {

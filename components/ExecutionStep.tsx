@@ -69,10 +69,10 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const { isVisible: telemetryVisible } = useTelemetryStore();
 
   const verifiedResults = flightResults.filter(f => f.status === 'verified');
-  const validCandidates = verifiedResults.length || 0;
-  const totalScanned = flightResults.length || 0;
-  const outOfRange = Math.max(0, totalScanned - validCandidates);
-  const estVolume = (config.maxApiCalls || 100) * 1200;
+  const validCandidates = metrics.candidatesFound || verifiedResults.length || 0;
+  const totalScanned = metrics.totalScanned || flightResults.length || 0;
+  const outOfRange = metrics.outOfRange ?? Math.max(0, totalScanned - validCandidates);
+  const estVolume = (metrics.maxApiCalls || config.maxApiCalls || 100) * 1200;
 
   const metricsData = useMemo(() => {
     const rankedResults = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
@@ -94,8 +94,6 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const daysToDeparture = departureDate 
     ? Math.ceil((departureDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : null;
-
-  const bottomPadding = telemetryVisible ? 'mb-48' : 'mb-20';
 
   return (
     <div className="w-full px-4 py-2 space-y-2 max-w-[100vw] overflow-x-hidden">
@@ -123,7 +121,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="API Calls"
-          value={metrics?.progress || '0/0'}
+          value={metrics.progress || `${metrics.apiCallsMade || 0}/${metrics.maxApiCalls || config.maxApiCalls || 0}`}
           variant="default"
           icon={Target}
         />
@@ -168,8 +166,8 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
       <FlightDataTable />
 
-      <div className={bottomPadding}>
-        <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden flex-1 min-h-[200px]">
+      <div className="flex flex-col flex-1 min-h-[200px]">
+        <div className="border border-slate-800 rounded-sm bg-slate-950 flex-1 overflow-hidden">
           <TerminalOutput />
         </div>
       </div>
