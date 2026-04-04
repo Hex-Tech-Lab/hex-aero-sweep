@@ -89,6 +89,19 @@ type FlightRowProps = {
   getStatusBadge,
 }: FlightRowProps) {
   const fb = fareBrand(flight);
+  
+  const keyConditions = (() => {
+    const bags = flight.metadata?.baggage || '1 PC';
+    const brandLower = (fb || '').toLowerCase();
+    if (brandLower.includes('flex') || brandLower.includes('business')) {
+      return 'Unlimited';
+    }
+    if (brandLower.includes('family') || brandLower.includes('plus')) {
+      return `${bags}, Free`;
+    }
+    return bags;
+  })();
+  
   return (
     <TableRow
       onClick={onClick}
@@ -107,59 +120,61 @@ type FlightRowProps = {
         isTopMatch && 'bg-amber-900/20 border-l-2 border-amber-500'
       )}
     >
-      <TableCell className={cn('font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
+      <TableCell className={cn('font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
         {flight.carrier}
       </TableCell>
-      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+      <TableCell className={cn('font-mono text-[10px] px-1', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
         {formatOutboundDate(flight)}
       </TableCell>
-      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-        {formatOutboundTime(flight)}
+      <TableCell className={cn('font-mono text-[9px] px-1', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatOutboundTime(flight).split('→')[0]}
       </TableCell>
-      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-        {formatInboundDate(flight)}
+      <TableCell className={cn('font-mono text-[9px] px-1', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
+        {formatInboundTime(flight).split('→')[0]}
       </TableCell>
-      <TableCell className={cn('font-mono text-[10px] px-2', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
-        {formatInboundTime(flight)}
-      </TableCell>
-      <TableCell className="text-center px-2">
-        <span className="text-[10px] font-mono text-slate-400 uppercase">
-          {flight.metadata?.cabinClass || 'Eco'}
+      <TableCell className="text-center px-1">
+        <span className={cn('text-[10px] font-mono uppercase', 
+          isOutOfRange ? 'text-slate-600' : 'text-slate-400'
+        )}>
+          {flight.metadata?.bookingClass || '-'}
         </span>
       </TableCell>
-      <TableCell className="px-2">
+      <TableCell className="px-1">
         <Badge
           variant={fb !== 'Standard' ? 'default' : 'outline'}
           className={cn(
-            'text-[8px] py-0 px-1',
+            'text-[7px] py-0 px-1',
             fb === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
             fb === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
             fb === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
             fb === 'Standard' && 'text-slate-500 border-slate-600/30'
           )}
         >
-          {fb}
+          {fb === 'Light' ? 'Lt' : fb === 'Flex' ? 'Fx' : fb === 'Plus' ? 'Pl' : fb === 'Family' ? 'Fm' : 'Std'}
         </Badge>
       </TableCell>
-      <TableCell className="text-center px-2">
-        <span className="text-[10px] font-mono text-slate-400">
-          {flight.metadata?.bookingClass || '-'}
-        </span>
-      </TableCell>
-      <TableCell className="text-center px-2">
+      <TableCell className="text-center px-1">
         <span className="text-[10px] font-mono text-slate-400">
           {flight.nights}N
         </span>
       </TableCell>
-      <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
-        ${flight.price.toFixed(2)}
+      <TableCell className="px-1">
+        <span className={cn('text-[8px] font-mono truncate max-w-[50px]', 
+          keyConditions === 'Unlimited' ? 'text-emerald-400' : 
+          keyConditions.includes('0') ? 'text-amber-400' : 'text-slate-500'
+        )}>
+          {keyConditions}
+        </span>
+      </TableCell>
+      <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
+        ${flight.price.toFixed(0)}
       </TableCell>
       <TableCell
-        className={cn('text-right font-mono font-bold text-[10px] px-2', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
+        className={cn('text-right font-mono font-bold text-[10px] px-1', isOutOfRange ? 'text-slate-500' : getStatusColor(flight.yieldDelta))}
       >
-        {flight.yieldDelta >= 0 ? '+' : ''}${flight.yieldDelta.toFixed(2)}
+        {flight.yieldDelta >= 0 ? '+' : ''}${Math.abs(flight.yieldDelta).toFixed(0)}
       </TableCell>
-      <TableCell className="px-2">
+      <TableCell className="px-1">
         {getStatusBadge(flight.status)}
       </TableCell>
     </TableRow>
@@ -480,32 +495,26 @@ export function FlightDataTable() {
               >
                 Carrier<SortIcon columnKey="carrier" />
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">
                 Out Date
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
-                Out Time
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">
+                Out
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
-                In Date
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">
+                In
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">
-                In Time
-              </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Cabin</TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Brand</TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Class</TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-center px-2">Nights</TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1 text-center">Class</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Brand</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1 text-center">Nights</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Key Cond.</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-1" onClick={() => handleSort('price')}>
                 Price<SortIcon columnKey="price" />
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('price')}>
-                Price<SortIcon columnKey="price" />
-              </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-2" onClick={() => handleSort('yieldDelta')}>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-1" onClick={() => handleSort('yieldDelta')}>
                 Yield<SortIcon columnKey="yieldDelta" />
               </TableHead>
-              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-2">Status</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

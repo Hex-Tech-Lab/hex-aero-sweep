@@ -119,6 +119,17 @@ export async function GET(request: NextRequest) {
 
   const cabinClass = cabinClassMap[fareClass] || 'economy';
 
+  const searchedSignatures = new Set<string>();
+  const seenCandidates = new Map<string, boolean>();
+  
+  function getSearchSignature(departureDate: string, returnDate: string): string {
+    return `${departureDate}_${returnDate}`;
+  }
+  
+  function getCandidateKey(candidate: any): string {
+    return `${candidate.departureDate}_${candidate.returnDate}_${candidate.price}_${candidate.carrier}`;
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       function sendMessage(message: SSEMessage) {
@@ -135,6 +146,9 @@ export async function GET(request: NextRequest) {
             outOfRange,
             progress: `${totalApiCalls}/${maxApiCalls}`,
             phase,
+            apiCallsMade: totalApiCalls,
+            maxApiCalls: maxApiCalls,
+            skippedDuplicates: searchedSignatures.size - totalApiCalls,
           },
         });
       }
@@ -210,11 +224,18 @@ export async function GET(request: NextRequest) {
           const selectedArm = ucb1.select(1.5);
           const probeDate = selectedArm.weekStartDate;
 
-          sendLog('info', `[PROBE ${probesExecuted + 1}/${phase1Budget}] Week ${selectedArm.weekIndex}: ${probeDate.toISOString().split('T')[0]}`);
-
           const departureDate = probeDate.toISOString().split('T')[0];
           const nights = Math.floor((minNights + maxNights) / 2);
           const returnDate = addDays(probeDate, nights).toISOString().split('T')[0];
+          const searchSig = getSearchSignature(departureDate, returnDate);
+
+          if (searchedSignatures.has(searchSig)) {
+            sendLog('info', `[SKIP] Already searched ${departureDate} - ${nights}N`);
+            continue;
+          }
+          searchedSignatures.add(searchSig);
+
+          sendLog('info', `[PROBE ${probesExecuted + 1}/${phase1Budget}] Week ${selectedArm.weekIndex}: ${departureDate} - ${nights}N`);
 
           totalApiCalls++;
 
@@ -241,6 +262,12 @@ export async function GET(request: NextRequest) {
 
             let bestPrice = Infinity;
             for (const candidate of candidates) {
+              const candidateKey = getCandidateKey(candidate);
+              if (seenCandidates.has(candidateKey)) {
+                continue;
+              }
+              seenCandidates.set(candidateKey, true);
+              
               if (candidate.status === 'verified') {
                 candidatesFound++;
                 sendLog('success', `[MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)}`);
@@ -327,12 +354,21 @@ export async function GET(request: NextRequest) {
         const chunkedSearches = exploitSearches.slice(0, phase3Budget);
 
         let exploitIndex = 0;
+        const filteredSearches = chunkedSearches.filter(s => {
+          const sig = getSearchSignature(s.departureDate, s.returnDate);
+          if (searchedSignatures.has(sig)) {
+            return false;
+          }
+          searchedSignatures.add(sig);
+          return true;
+        });
+
         await batchedSearchDuffel(
-          chunkedSearches,
+          filteredSearches,
           3,
           async (search) => {
             const idx = exploitIndex++;
-            sendLog('info', `[EXPLOIT ${idx + 1}/${chunkedSearches.length}] ${search.departureDate} (${search.returnDate})`);
+            sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
 
             totalApiCalls++;
 
@@ -361,6 +397,12 @@ export async function GET(request: NextRequest) {
               outOfRange += result.rejectedCount;
 
               for (const candidate of result.candidates) {
+                const candidateKey = getCandidateKey(candidate);
+                if (seenCandidates.has(candidateKey)) {
+                  continue;
+                }
+                seenCandidates.set(candidateKey, true);
+                
                 if (candidate.status === 'verified') {
                   candidatesFound++;
                   sendLog('success', `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`);
@@ -390,7 +432,16 @@ export async function GET(request: NextRequest) {
         }
 
         let polishIndex = 0;
-        for (const search of polishSearches) {
+        const filteredPolishSearches = polishSearches.filter(s => {
+          const sig = getSearchSignature(s.departureDate, s.returnDate);
+          if (searchedSignatures.has(sig)) {
+            return false;
+          }
+          searchedSignatures.add(sig);
+          return true;
+        });
+
+        for (const search of filteredPolishSearches) {
           if (polishIndex >= phase4Budget) break;
 
           sendLog('info', `[POLISH ${polishIndex + 1}/${Math.min(polishSearches.length, phase4Budget)}] ${search.departureDate} (${search.preference})`);
@@ -419,6 +470,12 @@ export async function GET(request: NextRequest) {
             outOfRange += searchResult.rejectedCount;
 
             for (const candidate of searchResult.candidates) {
+              const candidateKey = getCandidateKey(candidate);
+              if (seenCandidates.has(candidateKey)) {
+                continue;
+              }
+              seenCandidates.set(candidateKey, true);
+              
               if (candidate.status === 'verified') {
                 candidatesFound++;
                 sendLog('success', `[POLISH MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)}`);
@@ -444,7 +501,8 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        sendLog('success', `[COMPLETE] API Calls: ${totalApiCalls} | Scanned: ${totalScanned} | Matches: ${candidatesFound} | Out of Range: ${outOfRange}`);
+        const skippedDups = searchedSignatures.size - totalApiCalls;
+        sendLog('success', `[COMPLETE] API Calls: ${totalApiCalls}/${maxApiCalls} | Unique Searches: ${searchedSignatures.size} | Skipped: ${skippedDups} | Scanned: ${totalScanned} | Matches: ${candidatesFound}`);
 
         sendMessage({
           type: 'complete',
@@ -453,6 +511,9 @@ export async function GET(request: NextRequest) {
             candidatesFound,
             outOfRange,
             totalApiCalls,
+            maxApiCalls,
+            uniqueSearches: searchedSignatures.size,
+            skippedDuplicates: skippedDups,
             phaseBreakdown: {
               phase0: phase0Budget,
               phase1: probesExecuted,

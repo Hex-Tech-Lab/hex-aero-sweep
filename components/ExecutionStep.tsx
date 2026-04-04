@@ -116,8 +116,8 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="Est. Volume"
-          value={Math.min(estVolume, 99999).toLocaleString()}
-          subValue="Max API×1200"
+          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Math.min(estVolume, 999999))}
+          subValue="Max×1200"
           variant="info"
           icon={Activity}
         />
@@ -129,7 +129,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="Total Scanned"
-          value={Math.min(totalScanned, 99999).toLocaleString()}
+          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Math.min(totalScanned, 999999))}
           variant="default"
           icon={Activity}
         />
@@ -169,7 +169,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
       <FlightDataTable />
 
       <div className={bottomPadding}>
-        <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden">
+        <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden h-[calc(100vh-24rem)] min-h-[200px]">
           <TerminalOutput />
         </div>
       </div>
