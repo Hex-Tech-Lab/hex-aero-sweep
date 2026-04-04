@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 import { updateSearchLog } from '@/lib/supabase-operations';
-import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult, getHistoricPriors, batchedSearchDuffel } from '@/lib/duffel-service';
+import { searchDuffelOffers, isDuffelConfigured, FlightCandidate, OriginalTicketData, SearchResult, getHistoricPriors } from '@/lib/duffel-service';
 import { UCB1, WeeklyYieldData, WeeklyRewardData, microBatch } from '@/lib/ucb1';
 
 type SSEMessage = {
@@ -205,10 +205,12 @@ export async function GET(request: NextRequest) {
         sendLog('info', `${PHASE_LABELS.SEEDING} Loading historic priors from Amadeus/Stub`);
 
         const priors = getHistoricPriors(origin, destination, startDate, endDate);
+        const originalBrand = originalTicketData.brand || 'Standard';
 
         const ucb1 = new UCB1(weekStarts, 1.5);
         ucb1.seedWithPriors(priors);
 
+        sendLog('success', `[SYSTEM] Loaded ${priors.length} historical records. Defaulting to exact match for: ${originalBrand}`);
         sendLog('success', `${PHASE_LABELS.SEEDING} Loaded ${priors.length} prior weeks (UCB1 initialized)`);
         sendMessage({
           type: 'metrics',
@@ -267,6 +269,11 @@ export async function GET(request: NextRequest) {
                 continue;
               }
               seenCandidates.set(candidateKey, true);
+              
+              if (candidate.yieldDelta >= priceTolerance) {
+                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
+                continue;
+              }
               
               if (candidate.status === 'verified') {
                 candidatesFound++;
@@ -363,15 +370,15 @@ export async function GET(request: NextRequest) {
           return true;
         });
 
-        await batchedSearchDuffel(
-          filteredSearches,
-          3,
-          async (search) => {
-            const idx = exploitIndex++;
-            sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
+        for (const search of filteredSearches) {
+          if (totalApiCalls >= maxApiCalls) break;
+          
+          const idx = exploitIndex++;
+          sendLog('info', `[EXPLOIT ${idx + 1}/${filteredSearches.length}] ${search.departureDate} (${search.returnDate})`);
 
-            totalApiCalls++;
+          totalApiCalls++;
 
+          try {
             const result = await searchDuffelOffers({
               origin,
               destination,
@@ -389,30 +396,32 @@ export async function GET(request: NextRequest) {
               },
             });
 
-            return result;
-          },
-          (results) => {
-            for (const result of results) {
-              totalScanned += result.rawOffersCount;
-              outOfRange += result.rejectedCount;
+            totalScanned += result.rawOffersCount;
+            outOfRange += result.rejectedCount;
 
-              for (const candidate of result.candidates) {
-                const candidateKey = getCandidateKey(candidate);
-                if (seenCandidates.has(candidateKey)) {
-                  continue;
-                }
-                seenCandidates.set(candidateKey, true);
-                
-                if (candidate.status === 'verified') {
-                  candidatesFound++;
-                  sendLog('success', `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`);
-                }
-                sendMessage({ type: 'candidate', data: candidate });
+            for (const candidate of result.candidates) {
+              const candidateKey = getCandidateKey(candidate);
+              if (seenCandidates.has(candidateKey)) continue;
+              seenCandidates.set(candidateKey, true);
+              
+              if (candidate.yieldDelta >= priceTolerance) {
+                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
+                continue;
               }
+              
+              if (candidate.status === 'verified') {
+                candidatesFound++;
+                sendLog('success', `[MATCH!] ${candidate.carrier} ${candidate.departureDate} | ${candidate.nights}N | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`);
+              }
+              sendMessage({ type: 'candidate', data: candidate });
             }
-            sendMetrics('PHASE 3');
+          } catch (err) {
+            sendLog('error', `[EXPLOIT ERROR] ${search.departureDate}: ${err instanceof Error ? err.message : 'Unknown'}`);
           }
-        );
+
+          sendMetrics('PHASE 3');
+          await new Promise(r => setTimeout(r, 200));
+        }
 
         sendLog('info', `${PHASE_LABELS.POLISH} Polish phase: ${phase4Budget} calls for time-window permutations`);
 
@@ -442,9 +451,9 @@ export async function GET(request: NextRequest) {
         });
 
         for (const search of filteredPolishSearches) {
-          if (polishIndex >= phase4Budget) break;
+          if (polishIndex >= phase4Budget || totalApiCalls >= maxApiCalls) break;
 
-          sendLog('info', `[POLISH ${polishIndex + 1}/${Math.min(polishSearches.length, phase4Budget)}] ${search.departureDate} (${search.preference})`);
+          sendLog('info', `[POLISH ${polishIndex + 1}/${Math.min(filteredPolishSearches.length, phase4Budget)}] ${search.departureDate} (${search.preference})`);
 
           totalApiCalls++;
 
@@ -476,6 +485,11 @@ export async function GET(request: NextRequest) {
               }
               seenCandidates.set(candidateKey, true);
               
+              if (candidate.yieldDelta >= priceTolerance) {
+                sendLog('info', `[CIRCUIT] Dropped ${candidate.departureDate}: Δ$${candidate.yieldDelta.toFixed(2)} exceeds target $${priceTolerance}`);
+                continue;
+              }
+              
               if (candidate.status === 'verified') {
                 candidatesFound++;
                 sendLog('success', `[POLISH MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)}`);
@@ -488,6 +502,7 @@ export async function GET(request: NextRequest) {
           }
 
           polishIndex++;
+          await new Promise(r => setTimeout(r, 200));
           sendMetrics('PHASE 4');
 
           await new Promise((resolve) => setTimeout(resolve, 1500));

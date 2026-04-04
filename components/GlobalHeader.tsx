@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plane, Loader2 } from 'lucide-react';
+import { Plane, Loader2, StopCircle } from 'lucide-react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { useSSEStream } from '@/hooks/useSSEStream';
@@ -194,12 +194,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
                   size="sm"
                   className="h-7 text-xs"
                 >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                  >
-                    <Loader2 className="w-3 h-3 mr-1.5" />
-                  </motion.div>
+                  <StopCircle className="w-3 h-3 mr-1.5 text-red-500" />
                   Abort Sweep
                 </Button>
               )}

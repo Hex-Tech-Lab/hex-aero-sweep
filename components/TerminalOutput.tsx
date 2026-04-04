@@ -5,10 +5,22 @@ import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useEffect, useRef } from 'react';
+
+const MAX_BUFFER_SIZE = 500;
 
 export function TerminalOutput() {
   const { logs, clearLogs } = useTicketStore();
   const { isVisible: telemetryVisible } = useTelemetryStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const bufferedLogs = logs.length > MAX_BUFFER_SIZE ? logs.slice(-MAX_BUFFER_SIZE) : logs;
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [bufferedLogs]);
 
   const logColorClass: Record<string, string> = {
     info: 'text-cyan-400',
@@ -32,7 +44,7 @@ export function TerminalOutput() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] text-slate-700">
-            {logs.length}
+            {bufferedLogs.length}{logs.length > MAX_BUFFER_SIZE ? `/${logs.length}` : ''}
           </span>
           <Button
             variant="ghost"
@@ -45,13 +57,13 @@ export function TerminalOutput() {
         </div>
       </div>
 
-      <div className="flex flex-col max-h-64 overflow-y-auto overscroll-contain p-1 bg-slate-950">
-        {logs.length === 0 ? (
+      <div ref={scrollRef} className="flex flex-col max-h-64 overflow-y-auto overscroll-contain p-1 bg-slate-950 scroll-smooth">
+        {bufferedLogs.length === 0 ? (
           <div className="text-slate-700 text-center py-2 text-[9px] uppercase tracking-wider font-mono">
             READY...
           </div>
         ) : (
-          logs.map((log) => (
+          bufferedLogs.map((log) => (
             <div key={log.id} className="mb-0.5 flex gap-1.5 px-1 py-0.5 text-[9px] font-mono">
               <span className="text-slate-700 shrink-0">
                 [{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
