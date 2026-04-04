@@ -445,8 +445,11 @@ export function FlightDataTable() {
   }, [flightResults]);
 
   return (
-    <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden">
+    <div className="border border-slate-800 rounded-sm bg-slate-900/50 overflow-hidden w-full">
       <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-2">
+        <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+          Valid Candidate Matches
+        </h3>
         <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded uppercase shrink-0">
           {filteredAndSortedFlights.length}
         </span>

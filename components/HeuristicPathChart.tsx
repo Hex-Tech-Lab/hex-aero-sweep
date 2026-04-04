@@ -117,6 +117,7 @@ export function HeuristicPathChart() {
               domain={['dataMin - 1', 'dataMax + 1']}
               type="number"
               tickCount={8}
+              allowDecimals={false}
             />
             <YAxis
               dataKey="avgYield"

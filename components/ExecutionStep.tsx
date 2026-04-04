@@ -69,9 +69,9 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const { isVisible: telemetryVisible } = useTelemetryStore();
 
   const verifiedResults = flightResults.filter(f => f.status === 'verified');
-  const validCandidates = metrics?.candidatesFound || 0;
-  const totalScanned = metrics?.totalScanned || 0;
-  const outOfRange = metrics?.outOfRange || 0;
+  const validCandidates = verifiedResults.length || 0;
+  const totalScanned = flightResults.length || 0;
+  const outOfRange = Math.max(0, totalScanned - validCandidates);
   const estVolume = (config.maxApiCalls || 100) * 1200;
 
   const metricsData = useMemo(() => {
@@ -169,7 +169,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
       <FlightDataTable />
 
       <div className={bottomPadding}>
-        <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden h-[calc(100vh-24rem)] min-h-[200px]">
+        <div className="border border-slate-800 rounded-sm bg-slate-950 overflow-hidden flex-1 min-h-[200px]">
           <TerminalOutput />
         </div>
       </div>

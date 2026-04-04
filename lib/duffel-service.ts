@@ -1,5 +1,28 @@
 import { Duffel } from '@duffel/api';
 
+const DUFFEL_API_TIMEOUT_MS = 10000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => void
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      onTimeout();
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
+
 export interface FlightSegment {
   origin: string;
   destination: string;
@@ -262,7 +285,7 @@ export async function searchDuffelOffers(params: {
       console.log(`[Duffel] Filtering to allowed carriers: ${allowedCarriers.join(', ')}`);
     }
 
-    const offerRequest = await duffelClient.offerRequests.create({
+    const offerRequestPromise = duffelClient.offerRequests.create({
       slices: [
         {
           origin: params.origin,
@@ -281,7 +304,24 @@ export async function searchDuffelOffers(params: {
       allowed_carriers: allowedCarriers,
     } as any);
 
-    const offers = (offerRequest.data as any)?.offers || [];
+    let offerRequest: any;
+    try {
+      offerRequest = await withTimeout(
+        offerRequestPromise,
+        DUFFEL_API_TIMEOUT_MS,
+        () => console.warn(`[WARN] Duffel API timeout for date ${params.departureDate}`)
+      );
+    } catch (timeoutError) {
+      console.warn(`[Duffel] Request timed out for ${params.departureDate} - returning empty results`);
+      return { 
+        candidates: [], 
+        rawOffersCount: 0, 
+        rejectedCount: 0, 
+        rejectionReasons: ['api_timeout'] 
+      };
+    }
+
+    const offers = (offerRequest?.data as any)?.offers || [];
     const rawOffersCount = offers.length;
 
     console.log(`[Duffel] Retrieved ${offers.length} raw offers from API`);
