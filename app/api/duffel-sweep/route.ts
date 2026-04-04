@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
     origin,
     destination,
     routeLegs: [{ from: origin, to: destination }],
+    departureDate: searchWindowStart,
   };
 
   const cabinClassMap: Record<string, 'economy' | 'business' | 'first' | 'premium_economy'> = {

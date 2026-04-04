@@ -10,7 +10,7 @@ import { VolatilityChart } from '@/components/VolatilityChart';
 import { HeuristicPathChart } from '@/components/HeuristicPathChart';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Activity, Target, TrendingDown, TrendingUp, XCircle, CheckCircle2, Star } from 'lucide-react';
+import { Activity, Target, TrendingDown, TrendingUp, XCircle, CheckCircle2, Star, Calendar, PlaneTakeoff } from 'lucide-react';
 
 type MetricBoxProps = {
   label: string;
@@ -65,7 +65,7 @@ const MetricBox = ({
 };
 
 export function ExecutionStep({ onBack }: { onBack: () => void }) {
-  const { metrics, config, flightResults } = useTicketStore();
+  const { metrics, config, flightResults, ticket } = useTicketStore();
   const { isVisible: telemetryVisible } = useTelemetryStore();
 
   const verifiedResults = flightResults.filter(f => f.status === 'verified');
@@ -82,15 +82,42 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
     return { count: bestCount, yieldVal: yieldNum, display, isNegative: yieldNum !== null && yieldNum < 0 };
   }, [flightResults]);
 
+  const today = new Date();
+  const todayDisplay = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  
+  const departureDate = ticket?.departureDate ? new Date(ticket.departureDate) : null;
+  const departureDisplay = departureDate 
+    ? departureDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '--';
+  
+  const isPreDeparture = departureDate ? today < departureDate : true;
+  const daysToDeparture = departureDate 
+    ? Math.ceil((departureDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
   const bottomPadding = telemetryVisible ? 'mb-48' : 'mb-20';
 
   return (
     <div className="w-full px-4 py-2 space-y-2 max-w-[100vw] overflow-x-hidden">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 w-full">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-9 gap-2 w-full">
+        <MetricBox
+          label="Today"
+          value={todayDisplay}
+          subValue={today.toLocaleDateString('en-US', { weekday: 'short' })}
+          variant="info"
+          icon={Calendar}
+        />
+        <MetricBox
+          label="Departure"
+          value={departureDisplay}
+          subValue={daysToDeparture !== null ? `${daysToDeparture}D` : ''}
+          variant={isPreDeparture ? 'warning' : 'error'}
+          icon={PlaneTakeoff}
+        />
         <MetricBox
           label="Est. Volume"
           value={Math.min(estVolume, 99999).toLocaleString()}
-          subValue="Max API × 1200"
+          subValue="Max API×1200"
           variant="info"
           icon={Activity}
         />

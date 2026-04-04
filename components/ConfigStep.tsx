@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { syncPNRDetails } from '@/lib/duffel-service';
@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ChevronLeft, TriangleAlert as AlertTriangle, Plane, UserCheck, Baby } from 'lucide-react';
+import { ChevronRight, ChevronLeft, TriangleAlert as AlertTriangle, Plane, UserCheck, Baby, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSearchLog } from '@/lib/supabase-operations';
 
@@ -22,8 +22,26 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
   const { ticket, config, setConfig, setTicket, isConfigValid, isTicketExpired, isRebookingMode, setSweepExecutionId } = useTicketStore();
   const { addLog } = useTelemetryStore();
 
+  const recommendedApiCalls = useMemo(() => {
+    if (!config.searchWindowStart || !config.searchWindowEnd) return null;
+    const start = new Date(config.searchWindowStart);
+    const end = new Date(config.searchWindowEnd);
+    const windowDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const batchSize = Math.max(3, config.maxNights || 7);
+    const safetyMargin = 1.5;
+    const calculated = Math.ceil((windowDays / batchSize) * safetyMargin) * 10;
+    return Math.min(Math.max(calculated, 15), 1500);
+  }, [config.searchWindowStart, config.searchWindowEnd, config.maxNights]);
+
   const getPassengerType = (index: number): 'adult' | 'child' | 'infant' => {
     return passengerTypes[index] || 'adult';
+  };
+
+  const handleApplyRecommendation = () => {
+    if (recommendedApiCalls !== null) {
+      setConfig({ maxApiCalls: recommendedApiCalls });
+      toast.success(`API budget set to ${recommendedApiCalls} calls`);
+    }
   };
 
   const computePassengerBreakdown = useCallback(() => {
@@ -331,15 +349,16 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
                 </Label>
                 <Input
                   id="minNights"
-                  type="number"
-                  min="1"
-                  max="30"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={config.minNights}
-                  onChange={(e) =>
-                    setConfig({ minNights: parseInt(e.target.value) || 1 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    setConfig({ minNights: Math.min(Math.max(parseInt(raw) || 1, 1), 30) });
+                  }}
                   required
-                  className="bg-slate-950 border-slate-800 text-xs"
+                  className="bg-slate-950 border-slate-800 text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
 
@@ -349,15 +368,16 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
                 </Label>
                 <Input
                   id="maxNights"
-                  type="number"
-                  min="1"
-                  max="30"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={config.maxNights}
-                  onChange={(e) =>
-                    setConfig({ maxNights: parseInt(e.target.value) || 14 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    setConfig({ maxNights: Math.min(Math.max(parseInt(raw) || 14, 1), 30) });
+                  }}
                   required
-                  className="bg-slate-950 border-slate-800 text-xs"
+                  className="bg-slate-950 border-slate-800 text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -503,15 +523,17 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
                 </Label>
                 <Input
                   id="priceTolerance"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   value={config.priceTolerance}
-                  onChange={(e) =>
-                    setConfig({ priceTolerance: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9.]/g, '');
+                    const num = parseFloat(raw) || 0;
+                    setConfig({ priceTolerance: Math.max(num, 0) });
+                  }}
                   required
-                  className="bg-slate-950 border-slate-800 text-xs"
+                  className="bg-slate-950 border-slate-800 text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
                   Max acceptable price difference
@@ -519,23 +541,39 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
               </div>
 
               <div>
-                <Label htmlFor="maxApiCalls" className="text-slate-400 text-xs mb-1">
-                  Max API Calls *
-                </Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label htmlFor="maxApiCalls" className="text-slate-400 text-xs">
+                    Max API Calls *
+                  </Label>
+                  {recommendedApiCalls !== null && recommendedApiCalls !== config.maxApiCalls && (
+                    <button
+                      type="button"
+                      onClick={handleApplyRecommendation}
+                      className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Apply {recommendedApiCalls}
+                    </button>
+                  )}
+                </div>
                 <Input
                   id="maxApiCalls"
-                  type="number"
-                  min="1"
-                  max="500"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={config.maxApiCalls}
-                  onChange={(e) =>
-                    setConfig({ maxApiCalls: parseInt(e.target.value) || 100 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const num = parseInt(raw) || 0;
+                    setConfig({ maxApiCalls: Math.min(Math.max(num, 1), 1500) });
+                  }}
                   required
-                  className="bg-slate-950 border-slate-800 text-xs"
+                  className="bg-slate-950 border-slate-800 text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Sweep termination threshold
+                  {recommendedApiCalls !== null 
+                    ? `Recommended: ${recommendedApiCalls} (hard cap: 1500)`
+                    : 'Set search window for recommendation'}
                 </p>
               </div>
             </div>

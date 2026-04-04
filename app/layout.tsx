@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AEROSWEEP v4.0 | Aviation Pricing Intelligence',
+  title: 'AEROSWEEP v7.0 | Aviation Pricing Intelligence',
   description: 'High-density aviation pricing analysis platform for expert analysts',
   openGraph: {
     images: [

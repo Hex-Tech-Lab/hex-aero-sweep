@@ -42,6 +42,7 @@ export interface OriginalTicketData {
   destination: string;
   routeLegs: Array<{ from: string; to: string }>;
   brand?: string;
+  departureDate?: string;
 }
 
 export type TimePreference = 'any' | 'morning' | 'afternoon' | 'evening';
@@ -82,20 +83,26 @@ const AEGEAN_FARE_PENALTIES = {
   LIGHT: {
     code: 'light',
     checkedBagPenalty: 50,
-    changeFeePenalty: 40,
-    totalPenalty: 90
+    changeFeePenaltyPre: 0,
+    changeFeePenaltyPost: 70,
+    totalPenaltyPre: 50,
+    totalPenaltyPost: 120
   },
   FLEX: {
     code: 'flex',
     checkedBagPenalty: 0,
-    changeFeePenalty: 0,
-    totalPenalty: 0
+    changeFeePenaltyPre: 0,
+    changeFeePenaltyPost: 0,
+    totalPenaltyPre: 0,
+    totalPenaltyPost: 0
   },
   FAMILY: {
     code: 'family',
     checkedBagPenalty: 0,
-    changeFeePenalty: 0,
-    totalPenalty: 0
+    changeFeePenaltyPre: 0,
+    changeFeePenaltyPost: 0,
+    totalPenaltyPre: 0,
+    totalPenaltyPost: 0
   }
 };
 
@@ -114,7 +121,7 @@ const BOOKING_CLASS_TO_FARE: Record<string, string> = {
   P: 'family'
 };
 
-function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string): number {
+function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string, originalDepartureDate?: string): number {
   const brandLower = offerFareBrand.toLowerCase();
   if (brandLower.includes('family') || brandLower.includes('plus')) {
     return 0;
@@ -122,9 +129,18 @@ function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string)
   if (brandLower.includes('flex') || brandLower.includes('business')) {
     return 0;
   }
+  
   const normalizedClass = offerBookingClass?.toUpperCase() || 'Y';
   const fareType = BOOKING_CLASS_TO_FARE[normalizedClass] || 'light';
-  return AEGEAN_FARE_PENALTIES[fareType.toUpperCase() as keyof typeof AEGEAN_FARE_PENALTIES]?.totalPenalty || 90;
+  const penaltyConfig = AEGEAN_FARE_PENALTIES[fareType.toUpperCase() as keyof typeof AEGEAN_FARE_PENALTIES];
+  
+  if (!penaltyConfig) return 90;
+  
+  const isPreDeparture = originalDepartureDate 
+    ? new Date() < new Date(originalDepartureDate)
+    : true;
+  
+  return isPreDeparture ? penaltyConfig.totalPenaltyPre : penaltyConfig.totalPenaltyPost;
 }
 
 function calculateApplesToApplesPenalty(originalBrand: string, newBrand: string): number {
@@ -340,7 +356,7 @@ export async function searchDuffelOffers(params: {
       let yieldDelta = price - params.baseCost;
 
       const offerBookingClass = outboundSlice.fare_brand_name || offer.cabin_class || 'Y';
-      const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass);
+      const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass, params.originalTicket?.departureDate);
       yieldDelta += farePenalty;
 
       const originalBrand = params.originalTicket?.brand || 'Standard';
