@@ -17,7 +17,7 @@ export function SystemTelemetryPanel() {
 
   if (!isVisible) return null;
 
-  const panelHeight = isExpanded ? 'h-[25vh]' : 'h-12';
+  const panelHeight = isExpanded ? 'h-64' : 'h-12';
   const innerOverflow = isExpanded ? 'overflow-y-auto' : '';
 
   const getLogColor = (type: LogType): string => {
@@ -60,8 +60,8 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className={`fixed bottom-0 left-0 w-full mb-0 pb-0 z-50 bg-slate-950 border-t border-slate-800 ${panelHeight} transition-all duration-200 flex flex-col ${!isExpanded ? 'overflow-hidden' : ''}`}>
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
+    <div className={`shrink-0 transition-[height] duration-300 ease-in-out bg-slate-900 border-t border-slate-800 ${panelHeight} ${!isExpanded ? 'overflow-hidden' : ''}`}>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-900 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
           <span className="text-xs font-mono text-cyan-400 font-semibold">
@@ -86,7 +86,7 @@ export function SystemTelemetryPanel() {
             onClick={toggleExpanded}
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs font-mono text-slate-400 hover:text-slate-300 hover:bg-slate-900"
+            className="h-7 px-2 text-xs font-mono text-slate-400 hover:text-slate-300 hover:bg-slate-800"
           >
             {isExpanded ? (
               <>

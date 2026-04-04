@@ -5,6 +5,7 @@ import type { ElementType } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { TerminalOutput } from '@/components/TerminalOutput';
+import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 import { FlightDataTable } from '@/components/FlightDataTable';
 import { VolatilityChart } from '@/components/VolatilityChart';
 import { HeuristicPathChart } from '@/components/HeuristicPathChart';
@@ -166,10 +167,11 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
       <FlightDataTable />
 
-      <div className="max-h-[35vh] flex flex-col">
-        <div className="border border-slate-800 rounded-sm bg-slate-950 flex-1 overflow-hidden">
+      <div className="flex flex-col h-[35vh] w-full bg-slate-950 border-t border-slate-800">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <TerminalOutput />
         </div>
+        <SystemTelemetryPanel />
       </div>
     </div>
   );

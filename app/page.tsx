@@ -7,7 +7,6 @@ import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
 import { ConfigStep } from '@/components/ConfigStep';
 import { ExecutionStep } from '@/components/ExecutionStep';
-import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -70,8 +69,6 @@ export default function Home() {
       {currentStep === 3 && (
         <ExecutionStep onBack={() => setCurrentStep(2)} />
       )}
-
-      <SystemTelemetryPanel />
     </div>
   );
 }
