@@ -114,32 +114,32 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
         />
         <MetricBox
           label="Est. Volume"
-          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Math.min(estVolume, 999999))}
+          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(estVolume)}
           subValue="Max×1200"
           variant="info"
           icon={Activity}
         />
         <MetricBox
           label="API Calls"
-          value={metrics.progress || `${metrics.apiCallsMade || 0}/${metrics.maxApiCalls || config.maxApiCalls || 0}`}
+          value={metrics.progress || `0 / ${metrics.maxApiCalls || config.maxApiCalls || 0}`}
           variant="default"
           icon={Target}
         />
         <MetricBox
           label="Total Scanned"
-          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Math.min(totalScanned, 999999))}
+          value={Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(totalScanned)}
           variant="default"
           icon={Activity}
         />
         <MetricBox
           label="Out of Range"
-          value={Math.min(outOfRange, 9999).toLocaleString()}
+          value={outOfRange.toLocaleString()}
           variant="error"
           icon={XCircle}
         />
         <MetricBox
           label="Valid"
-          value={Math.min(validCandidates, 9999).toLocaleString()}
+          value={validCandidates.toLocaleString()}
           variant="success"
           icon={CheckCircle2}
         />
@@ -166,7 +166,7 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
       <FlightDataTable />
 
-      <div className="flex flex-col flex-1 min-h-[200px]">
+      <div className="max-h-[35vh] flex flex-col">
         <div className="border border-slate-800 rounded-sm bg-slate-950 flex-1 overflow-hidden">
           <TerminalOutput />
         </div>

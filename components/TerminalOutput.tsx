@@ -6,7 +6,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useRef } from 'react';
 
-const MAX_BUFFER_SIZE = 500;
+const MAX_BUFFER_SIZE = 50;
 
 export function TerminalOutput() {
   const { logs, clearLogs } = useTicketStore();
@@ -28,7 +28,7 @@ export function TerminalOutput() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 min-h-0">
+    <div className="flex flex-col h-full bg-slate-950 max-h-[35vh]">
       <div className="flex items-center justify-between p-1.5 border-b border-slate-800 shrink-0 bg-slate-950">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -53,7 +53,7 @@ export function TerminalOutput() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain p-1 bg-slate-950 scroll-smooth min-h-0">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain p-1 bg-slate-950 scroll-smooth">
         {bufferedLogs.length === 0 ? (
           <div className="text-slate-700 text-center py-2 text-[9px] uppercase tracking-wider font-mono">
             READY...
