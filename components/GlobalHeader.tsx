@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plane, Loader2, StopCircle } from 'lucide-react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
-import { useSSEStream } from '@/hooks/useSSEStream';
+import { useClientSweep } from '@/hooks/useClientSweep';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,24 +21,20 @@ type GlobalHeaderProps = {
 export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
   const router = useRouter();
   const resetStore = useTicketStore((state) => state.resetStore);
-  const { ticket, config, metrics, setMetrics, clearLogs, clearFlightResults, addLog, sweepExecutionId } = useTicketStore();
+  const { ticket, config, metrics, setMetrics, clearLogs, clearFlightResults, addLog } = useTicketStore();
   const { addLog: addTelemetryLog } = useTelemetryStore();
-  const { connect, disconnect, isConnected } = useSSEStream();
+  const { runSweep, abort } = useClientSweep();
   const [hasStarted, setHasStarted] = useState(false);
+  const [isClientRunning, setIsClientRunning] = useState(false);
 
   const handleLogoClick = () => {
     resetStore();
     router.push('/');
   };
 
-  const handleStart = () => {
+  const handleStart = useCallback(async () => {
     if (!ticket.issueDate || !config.searchWindowStart || !config.searchWindowEnd) {
       toast.error('Invalid configuration');
-      return;
-    }
-
-    if (!sweepExecutionId) {
-      toast.error('No session ID found');
       return;
     }
 
@@ -48,63 +44,50 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
 
     addLog({
       level: 'info',
-      message: '[SYSTEM] Initializing sweep orchestrator...',
+      message: '[SYSTEM] Initializing client-side sweep orchestrator...',
     });
-
-    const sweepParams = {
-      sessionId: sweepExecutionId,
-      searchWindowStart: new Date(config.searchWindowStart).toISOString().split('T')[0],
-      searchWindowEnd: new Date(config.searchWindowEnd).toISOString().split('T')[0],
-      minNights: config.minNights,
-      maxNights: config.maxNights,
-      priceTolerance: config.priceTolerance,
-      maxApiCalls: config.maxApiCalls,
-      baseCost: ticket.baseCost || 792.87,
-      passengers: ticket.passengers.length,
-      directFlightOnly: config.directFlightOnly,
-      outboundTimePreference: config.outboundTimePreference,
-      inboundTimePreference: config.inboundTimePreference,
-      passengerBreakdown: ticket.passengerBreakdown,
-    };
 
     addTelemetryLog({
       source: 'DUFFEL',
       type: 'REQUEST',
-      message: `Initiating Provider sweep - Session: ${sweepExecutionId}`,
-      payload: sweepParams
+      message: 'Initiating Provider sweep (client-side)',
+      payload: {
+        searchWindowStart: config.searchWindowStart,
+        searchWindowEnd: config.searchWindowEnd,
+        maxApiCalls: config.maxApiCalls,
+      }
     });
 
-    connect({
-      ...sweepParams,
-      onComplete: () => {
-        const finalMetrics = useTicketStore.getState().metrics;
-        addTelemetryLog({
-          source: 'DUFFEL',
-          type: 'RESPONSE',
-          message: 'Provider sweep completed successfully',
-          payload: { sessionId: sweepExecutionId, metrics: finalMetrics }
-        });
-        toast.success('Sweep completed successfully');
-      },
-      onError: (error) => {
-        const finalMetrics = useTicketStore.getState().metrics;
-        addTelemetryLog({
-          source: 'DUFFEL',
-          type: 'ERROR',
-          message: `Provider sweep failed: ${error}`,
-          payload: { sessionId: sweepExecutionId, error, metrics: finalMetrics }
-        });
-        toast.error(`Sweep failed: ${error}`);
-      },
-    });
-
+    setIsClientRunning(true);
     setHasStarted(true);
-  };
 
-  const handleStop = () => {
-    disconnect();
+    try {
+      await runSweep();
+      toast.success('Sweep completed successfully');
+      addTelemetryLog({
+        source: 'DUFFEL',
+        type: 'RESPONSE',
+        message: 'Provider sweep completed successfully',
+        payload: { status: 'completed' }
+      });
+    } catch (err) {
+      toast.error(`Sweep failed: ${err instanceof Error ? err.message : 'Unknown'}`);
+      addTelemetryLog({
+        source: 'DUFFEL',
+        type: 'ERROR',
+        message: `Provider sweep failed: ${err instanceof Error ? err.message : 'Unknown'}`,
+        payload: { error: err }
+      });
+    } finally {
+      setIsClientRunning(false);
+    }
+  }, [ticket, config, clearLogs, clearFlightResults, setMetrics, addLog, addTelemetryLog, runSweep]);
+
+  const handleStop = useCallback(() => {
+    abort();
+    setMetrics({ status: 'aborted' });
     toast.warning('Sweep aborted');
-  };
+  }, [abort, setMetrics]);
 
   const getStatusBadgeVariant = () => {
     switch (metrics.status) {
@@ -115,7 +98,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
     }
   };
 
-  const isRunning = metrics.status === 'running' && isConnected;
+  const isRunning = metrics.status === 'running' || isClientRunning;
 
   return (
     <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm sticky top-0 z-50">
@@ -179,7 +162,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
               {!hasStarted || metrics.status === 'completed' || metrics.status === 'error' ? (
                 <Button
                   onClick={handleStart}
-                  disabled={isConnected}
+                  disabled={isClientRunning}
                   size="sm"
                   className="bg-cyan-600 hover:bg-cyan-700 text-white h-7 text-xs"
                 >
@@ -189,7 +172,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
               ) : (
                 <Button
                   onClick={handleStop}
-                  disabled={!isConnected}
+                  disabled={!isClientRunning}
                   variant="destructive"
                   size="sm"
                   className="h-7 text-xs"
@@ -199,7 +182,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
                 </Button>
               )}
 
-              <Button variant="outline" size="sm" onClick={onBack} disabled={isConnected} className="h-7 text-xs">
+              <Button variant="outline" size="sm" onClick={onBack} disabled={isClientRunning} className="h-7 text-xs">
                 <ChevronLeft className="w-3 h-3 mr-1.5" />
                 Back
               </Button>
