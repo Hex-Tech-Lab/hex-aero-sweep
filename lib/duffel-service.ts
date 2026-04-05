@@ -51,6 +51,7 @@ export interface FlightCandidate {
     cabinClass: string;
     bookingClass: string;
     fareBrand?: string;
+    tierPenalty?: number;
     layoverDuration?: string;
     timePreferences?: {
       outbound?: { preference: string; actual: string } | null;
@@ -424,8 +425,8 @@ export async function searchDuffelOffers(params: {
       yieldDelta += farePenalty;
 
       const originalBrand = params.originalTicket?.brand || 'Standard';
-      const applesToApplesPenalty = calculateApplesToApplesPenalty(originalBrand, fareBrand);
-      yieldDelta += applesToApplesPenalty;
+      const tierPenalty = calculateApplesToApplesPenalty(originalBrand, fareBrand);
+      yieldDelta += tierPenalty;
 
       const outboundSegments: FlightSegment[] = outboundSlice.segments.map((seg: any) => ({
         origin: seg.origin?.iata_code || '',
@@ -480,6 +481,7 @@ export async function searchDuffelOffers(params: {
           cabinClass: offer.cabin_class || 'economy',
           bookingClass: outboundSlice.fare_brand_name || offer.cabin_class || 'Y',
           fareBrand,
+          tierPenalty,
           timePreferences: {
             outbound: outboundTimePreference !== 'any' ? { preference: outboundTimePreference, actual: getTimeSlot(outboundDepartureTime) } : null,
             inbound: inboundTimePreference !== 'any' ? { preference: inboundTimePreference, actual: getTimeSlot(inboundDepartureTime) } : null,

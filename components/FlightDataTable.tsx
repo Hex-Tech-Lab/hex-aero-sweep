@@ -103,6 +103,10 @@ type FlightRowProps = {
     return parsedBags > 0 ? `${parsedBags}x 23kg Checked Bag` : '0 Checked Bags (Cabin Only)';
   })();
   
+  // Tier penalty detection
+  const hasTierPenalty = flight.metadata?.tierPenalty > 0;
+  const tierPenaltyAmount = flight.metadata?.tierPenalty || 0;
+  
   return (
     <TableRow
       onClick={onClick}
@@ -161,12 +165,22 @@ type FlightRowProps = {
         </span>
       </TableCell>
       <TableCell className="px-1">
-        <span className={cn('text-[8px] font-mono truncate max-w-[50px]', 
-          keyConditions === 'Unlimited' ? 'text-emerald-400' : 
-          keyConditions.includes('0') ? 'text-amber-400' : 'text-slate-500'
-        )}>
-          {keyConditions}
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className={cn('text-[8px] font-mono truncate max-w-[50px]', 
+            keyConditions === 'Unlimited' ? 'text-emerald-400' : 
+            keyConditions.includes('0') ? 'text-amber-400' : 'text-slate-500'
+          )}>
+            {keyConditions}
+          </span>
+          {hasTierPenalty && (
+            <span 
+              className="text-[7px] text-red-400 font-semibold bg-red-950/50 px-1 rounded"
+              title={`+$${tierPenaltyAmount.toFixed(0)} Tier Downgrade Penalty Applied`}
+            >
+              ⚠️ +${tierPenaltyAmount.toFixed(0)} Penalty
+            </span>
+          )}
+        </div>
       </TableCell>
       <TableCell className={cn('text-right font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-500' : 'text-slate-100')}>
         ${flight.price.toFixed(0)}

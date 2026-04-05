@@ -166,27 +166,41 @@ export function useClientSweep() {
 
     addLog({ level: 'info', message: `[EXPLOIT PHASE] Budget: ${exploitationBudget} calls | Focusing on promising nodes via UCB1...` });
 
-    // Find best node from probe phase
+    // Find TOP 3 best nodes from probe phase (not just 1)
     const probedNodes = searchNodes.filter(n => n.explored);
-    const bestProbeNode = probedNodes.length > 0 
-      ? probedNodes.reduce((best, node) => node.bestPrice < best.bestPrice ? node : best, probedNodes[0])
-      : null;
+    const top3ProbeNodes = probedNodes.length > 0
+      ? [...probedNodes]
+          .sort((a, b) => a.bestPrice - b.bestPrice)
+          .slice(0, 3)
+      : [];
 
-    // Add surrounding nodes (±10 days from best probe node)
-    if (bestProbeNode) {
-      const bestIndex = searchNodes.findIndex(n => 
-        n.departureDate === bestProbeNode.departureDate && n.returnDate === bestProbeNode.returnDate
-      );
-      const surroundRange = 10;
-      const surroundStart = Math.max(0, bestIndex - surroundRange);
-      const surroundEnd = Math.min(searchNodes.length - 1, bestIndex + surroundRange);
+    // Add surrounding nodes (±10 days from ALL 3 top probe nodes)
+    if (top3ProbeNodes.length > 0) {
+      const topDates = top3ProbeNodes.map(n => `${n.departureDate}_${n.returnDate}`);
+      addLog({ level: 'info', message: `[EXPLOIT] Top 3 probe dates: ${topDates.join(', ')}` });
       
-      for (let i = surroundStart; i <= surroundEnd; i++) {
-        if (!searchNodes[i].explored && searchNodes[i].count === 0) {
-          searchNodes[i].count = 0.5; // Give partial credit to prioritize
+      const surroundRange = 10;
+      let prioritizedCount = 0;
+      
+      for (const topNode of top3ProbeNodes) {
+        const nodeIndex = searchNodes.findIndex(n => 
+          n.departureDate === topNode.departureDate && n.returnDate === topNode.returnDate
+        );
+        
+        if (nodeIndex >= 0) {
+          const surroundStart = Math.max(0, nodeIndex - surroundRange);
+          const surroundEnd = Math.min(searchNodes.length - 1, nodeIndex + surroundRange);
+          
+          for (let i = surroundStart; i <= surroundEnd; i++) {
+            if (!searchNodes[i].explored && searchNodes[i].count === 0) {
+              searchNodes[i].count = 0.5; // Give partial credit to prioritize
+              prioritizedCount++;
+            }
+          }
         }
       }
-      addLog({ level: 'info', message: `[EXPLOIT] Best probe: ${bestProbeNode.departureDate} | Surrounding ±${surroundRange} days prioritized` });
+      
+      addLog({ level: 'info', message: `[EXPLOIT] ${prioritizedCount} surrounding nodes prioritized (±${surroundRange} days from Top 3)` });
     }
 
     let exploitCalls = 0;
