@@ -77,7 +77,8 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
   const metricsData = useMemo(() => {
     const rankedResults = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
-    const bestCount = rankedResults.length > 0 ? Math.min(rankedResults.length, 3) : 0;
+    const topMatches = [...rankedResults].sort((a, b) => a.price - b.price).slice(0, 3);
+    const bestCount = topMatches.length;
     const yieldNum = rankedResults.length > 0 ? Math.min(...rankedResults.map(f => f.yieldDelta)) : null;
     const display = yieldNum !== null ? (yieldNum < 0 ? `-$${Math.abs(yieldNum).toFixed(2)}` : `+$${yieldNum.toFixed(2)}`) : '-';
     return { count: bestCount, yieldVal: yieldNum, display, isNegative: yieldNum !== null && yieldNum < 0 };
@@ -152,9 +153,9 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
           icon={Star}
         />
         <MetricBox
-          label="Best Yield"
+          label="Best Diff"
           value={metricsData.display}
-          subValue={metricsData.isNegative ? '↓ Save' : '↑ Best'}
+          subValue={metricsData.isNegative ? '↓ Save' : '↑ Premium'}
           variant={metricsData.isNegative ? 'success' : 'warning'}
           icon={metricsData.isNegative ? TrendingDown : TrendingUp}
         />
@@ -167,11 +168,11 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
       <FlightDataTable />
 
-      <div className="flex flex-col h-[35vh] w-full bg-slate-950 border-t border-slate-800">
-        <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="grid h-[35vh] w-full bg-slate-950 border-t border-slate-800" style={{ gridTemplateRows: '1fr auto' }}>
+        <div className="min-h-0 overflow-y-auto p-4">
           <TerminalOutput />
         </div>
-        <SystemTelemetryPanel />
+        <SystemTelemetryPanel className="transition-all duration-300 ease-in-out bg-slate-900 border-t border-slate-800" />
       </div>
     </div>
   );

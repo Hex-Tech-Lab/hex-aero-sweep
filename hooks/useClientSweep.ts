@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 
-const CHUNK_SIZE = 3;
+const CHUNK_SIZE = 12;
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
@@ -16,9 +16,28 @@ function chunkArray<T>(array: T[], size: number): T[][] {
   );
 }
 
+// UCB1 scoring for exploration/exploitation balance
+function calculateUCB1(count: number, totalReward: number, parentVisits: number, explorationConstant: number = 1.414): number {
+  if (count === 0) return Infinity;
+  const exploitation = totalReward / count;
+  const exploration = explorationConstant * Math.sqrt(Math.log(parentVisits) / count);
+  return exploitation + exploration;
+}
+
+interface SearchNode {
+  departureDate: string;
+  returnDate: string;
+  nights: number;
+  count: number;
+  totalReward: number;
+  avgPrice: number;
+  bestPrice: number;
+  explored: boolean;
+}
+
 export function useClientSweep() {
   const abortRef = useRef(false);
-  
+
   const {
     ticket,
     config,
@@ -28,69 +47,222 @@ export function useClientSweep() {
     clearLogs,
     clearFlightResults,
   } = useTicketStore();
-  
+
   const { addLog: addTelemetryLog } = useTelemetryStore();
 
   const runSweep = useCallback(async () => {
     abortRef.current = false;
-    
+
     const baseCost = ticket.baseCost || 792.87;
     const maxAcceptablePrice = baseCost + config.priceTolerance;
     let totalApiCalls = 0;
     let totalScanned = 0;
     let candidatesFound = 0;
     let outOfRange = 0;
-    
+
     clearLogs();
     clearFlightResults();
     setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running' });
-    
-    addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.0 CLIENT ORCHESTRATOR ONLINE' });
-    addLog({ level: 'info', message: `[SYSTEM] Budget: ${config.maxApiCalls} API calls` });
-    
+
+    addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
+    addLog({ level: 'info', message: `[SYSTEM] Budget: ${config.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
+
     if (!config.searchWindowStart || !config.searchWindowEnd) {
       addLog({ level: 'error', message: '[SYSTEM] Search window not configured' });
       return { totalApiCalls: 0, totalScanned: 0, candidatesFound: 0 };
     }
-    
+
     const startDate = new Date(config.searchWindowStart);
     const endDate = new Date(config.searchWindowEnd);
     const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const searches: { departureDate: string; returnDate: string }[] = [];
+
+    // Build search space
+    const searchNodes: SearchNode[] = [];
     const searchSignatures = new Set<string>();
-    
-    for (let d = 0; d <= totalDays && searches.length < config.maxApiCalls; d++) {
+
+    for (let d = 0; d <= totalDays && searchNodes.length < config.maxApiCalls; d++) {
       const depDate = addDays(startDate, d);
-      for (let nights = config.minNights; nights <= config.maxNights && searches.length < config.maxApiCalls; nights++) {
+      for (let nights = config.minNights; nights <= config.maxNights && searchNodes.length < config.maxApiCalls; nights++) {
         const retDate = addDays(depDate, nights);
         if (retDate <= endDate) {
           const depStr = depDate.toISOString().split('T')[0];
           const retStr = retDate.toISOString().split('T')[0];
           const sig = `${depStr}_${retStr}`;
-          
+
           if (!searchSignatures.has(sig)) {
             searchSignatures.add(sig);
-            searches.push({ departureDate: depStr, returnDate: retStr });
+            searchNodes.push({
+              departureDate: depStr,
+              returnDate: retStr,
+              nights,
+              count: 0,
+              totalReward: 0,
+              avgPrice: Infinity,
+              bestPrice: Infinity,
+              explored: false,
+            });
           }
         }
       }
     }
-    
-    addLog({ level: 'info', message: `[SYSTEM] Generated ${searches.length} unique searches` });
-    
-    const chunks = chunkArray(searches, CHUNK_SIZE);
-    addLog({ level: 'info', message: `[SYSTEM] Processing in ${chunks.length} chunks of ${CHUNK_SIZE}` });
-    
-    for (let i = 0; i < chunks.length && !abortRef.current; i++) {
-      const chunk = chunks[i];
-      
+
+    addLog({ level: 'info', message: `[SYSTEM] Generated ${searchNodes.length} unique search nodes` });
+
+    // Phase 1: PROBE - Strategic sampling across the timeline
+    const probeCount = Math.min(24, Math.ceil(searchNodes.length * 0.15));
+    const probeNodes = selectProbeNodes(searchNodes, probeCount);
+
+    addLog({ level: 'info', message: `[PROBE PHASE] Sampling ${probeNodes.length} strategic nodes across timeline...` });
+
+    const probeChunks = chunkArray(probeNodes, CHUNK_SIZE);
+    for (let i = 0; i < probeChunks.length && !abortRef.current; i++) {
+      const chunk = probeChunks[i];
+      const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+
+      totalApiCalls += result.apiCalls;
+      totalScanned += result.scanned;
+      outOfRange += result.rejected;
+      candidatesFound += result.candidates.length;
+
+      // Update node statistics
+      for (const candidate of result.candidates) {
+        const node = searchNodes.find(n => n.departureDate === candidate.departureDate && n.returnDate === candidate.returnDate);
+        if (node) {
+          node.count++;
+          node.totalReward += (baseCost - candidate.price);
+          node.bestPrice = Math.min(node.bestPrice, candidate.price);
+          node.avgPrice = node.totalReward / node.count;
+          node.explored = true;
+        }
+        addLog({
+          level: 'success',
+          message: `[PROBE MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
+        } as any);
+        addFlightResult(candidate);
+      }
+
+      updateMetrics();
+      addLog({ level: 'info', message: `[PROBE ${i + 1}/${probeChunks.length}] Chunk complete | Found ${result.candidates.length} candidates` });
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    if (abortRef.current) {
+      addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted after PROBE phase' });
+      return finalize();
+    }
+
+    // Phase 2: EXPLOIT - Focus on cheapest nodes using UCB1
+    const remainingBudget = config.maxApiCalls - totalApiCalls;
+    const exploitationBudget = Math.floor(remainingBudget * 0.7);
+
+    addLog({ level: 'info', message: `[EXPLOIT PHASE] Budget: ${exploitationBudget} calls | Focusing on promising nodes via UCB1...` });
+
+    let exploitCalls = 0;
+    const parentVisits = totalApiCalls + 1;
+
+    while (exploitCalls < exploitationBudget && !abortRef.current) {
+      // Rank unexplored nodes by UCB1 score
+      const rankedNodes = searchNodes
+        .filter(n => !n.explored)
+        .map(node => ({
+          node,
+          score: calculateUCB1(node.count, baseCost - node.avgPrice, parentVisits),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      if (rankedNodes.length === 0) break;
+
+      // Select top nodes for next chunk
+      const batchSize = Math.min(CHUNK_SIZE, rankedNodes.length, exploitationBudget - exploitCalls);
+      const batch = rankedNodes.slice(0, batchSize).map(r => r.node);
+
+      const result = await processChunk(batch, baseCost, maxAcceptablePrice, ticket, config);
+
+      totalApiCalls += result.apiCalls;
+      exploitCalls += result.apiCalls;
+      totalScanned += result.scanned;
+      outOfRange += result.rejected;
+      candidatesFound += result.candidates.length;
+
+      for (const candidate of result.candidates) {
+        const node = searchNodes.find(n => n.departureDate === candidate.departureDate && n.returnDate === candidate.returnDate);
+        if (node) {
+          node.count++;
+          node.totalReward += (baseCost - candidate.price);
+          node.bestPrice = Math.min(node.bestPrice, candidate.price);
+          node.avgPrice = node.totalReward / node.count;
+          node.explored = true;
+        }
+        addLog({
+          level: 'success',
+          message: `[EXPLOIT MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
+        } as any);
+        addFlightResult(candidate);
+      }
+
+      updateMetrics();
+
+      if (result.candidates.length > 0) {
+        addLog({ level: 'success', message: `[EXPLOIT] Batch found ${result.candidates.length} candidates | Best: $${Math.min(...result.candidates.map(c => c.price)).toFixed(2)}` });
+      }
+
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    if (abortRef.current) {
+      addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted after EXPLOIT phase' });
+      return finalize();
+    }
+
+    // Phase 3: FINALIZE - Deep search on top matches for exact comparison
+    const verifiedCandidates = searchNodes.filter(n => n.explored && n.bestPrice < maxAcceptablePrice);
+    const topNodes = verifiedCandidates
+      .sort((a, b) => a.bestPrice - b.bestPrice)
+      .slice(0, 6);
+
+    if (topNodes.length > 0) {
+      addLog({ level: 'info', message: `[FINALIZE PHASE] Deep search on ${topNodes.length} top candidates for exact mapping...` });
+
+      const finalizeChunks = chunkArray(topNodes, CHUNK_SIZE);
+      for (let i = 0; i < finalizeChunks.length && !abortRef.current; i++) {
+        const chunk = finalizeChunks[i];
+        const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+
+        totalApiCalls += result.apiCalls;
+        totalScanned += result.scanned;
+        outOfRange += result.rejected;
+        candidatesFound += result.candidates.length;
+
+        for (const candidate of result.candidates) {
+          addLog({
+            level: 'success',
+            message: `[FINALIZE MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} ✓`,
+          } as any);
+          addFlightResult({ ...candidate, status: 'verified' });
+        }
+
+        updateMetrics();
+        addLog({ level: 'info', message: `[FINALIZE ${i + 1}/${finalizeChunks.length}] Deep search complete` });
+      }
+    }
+
+    return finalize();
+
+    async function processChunk(
+      nodes: SearchNode[],
+      baseCost: number,
+      maxPrice: number,
+      ticket: any,
+      config: any
+    ): Promise<{ apiCalls: number; scanned: number; rejected: number; candidates: any[] }> {
+      const searches = nodes.map(n => ({ departureDate: n.departureDate, returnDate: n.returnDate }));
+
       try {
         const res = await fetch('/api/duffel-chunk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            searches: chunk,
+            searches,
             origin: 'CAI',
             destination: 'ATH',
             cabinClass: 'economy',
@@ -101,82 +273,89 @@ export function useClientSweep() {
             directFlightOnly: config.directFlightOnly,
           }),
         });
-        
+
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        
+
         const data = await res.json();
-        
+        const candidates: any[] = [];
+        let scanned = 0;
+        let rejected = 0;
+
         for (const result of data.results) {
-          totalApiCalls++;
-          totalScanned += result.rawOffersCount;
-          outOfRange += result.rejectedCount;
-          
-          for (const candidate of result.candidates) {
-            candidatesFound++;
-            addLog({
-              level: 'success',
-              message: `[MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
-            } as any);
-            addFlightResult(candidate);
-          }
+          scanned += result.rawOffersCount;
+          rejected += result.rejectedCount;
+          candidates.push(...result.candidates);
         }
-        
-        setMetrics({
-          totalScanned,
-          candidatesFound,
-          outOfRange,
-          status: 'running',
-          progress: `${totalApiCalls}/${config.maxApiCalls}`,
-          apiCallsMade: totalApiCalls,
-          maxApiCalls: config.maxApiCalls,
-        });
-        
-        addLog({
-          level: 'info',
-          message: `[CHUNK ${i + 1}/${chunks.length}] ${chunk.length} searches, ${data.results.reduce((sum: number, r: any) => sum + r.candidates.length, 0)} candidates`,
-        });
-        
-        await new Promise(r => setTimeout(r, 100));
-        
+
+        return {
+          apiCalls: searches.length,
+          scanned,
+          rejected,
+          candidates,
+        };
       } catch (err) {
-        addLog({
-          level: 'error',
-          message: `[CHUNK ERROR] ${err instanceof Error ? err.message : 'Unknown'}`,
-        });
-      }
-      
-      if (abortRef.current) {
-        addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted by user' });
-        break;
+        addLog({ level: 'error', message: `[CHUNK ERROR] ${err instanceof Error ? err.message : 'Unknown'}` });
+        return { apiCalls: searches.length, scanned: 0, rejected: 0, candidates: [] };
       }
     }
-    
-    setMetrics({
-      totalScanned,
-      candidatesFound,
-      outOfRange,
-      status: abortRef.current ? 'aborted' : 'completed',
-      progress: `${totalApiCalls}/${config.maxApiCalls}`,
-      apiCallsMade: totalApiCalls,
-      maxApiCalls: config.maxApiCalls,
-    });
-    
-    addLog({
-      level: 'success',
-      message: `[COMPLETE] API Calls: ${totalApiCalls} | Scanned: ${totalScanned} | Matches: ${candidatesFound}`,
-    });
-    
-    addTelemetryLog({
-      source: 'SYSTEM',
-      type: 'RESPONSE',
-      message: `Sweep ${abortRef.current ? 'aborted' : 'completed'}`,
-      payload: { totalApiCalls, totalScanned, candidatesFound },
-    });
-    
-    return { totalApiCalls, totalScanned, candidatesFound };
-    
+
+    function updateMetrics() {
+      setMetrics({
+        totalScanned,
+        candidatesFound,
+        outOfRange,
+        status: 'running',
+        progress: `${totalApiCalls}/${config.maxApiCalls}`,
+        apiCallsMade: totalApiCalls,
+        maxApiCalls: config.maxApiCalls,
+      });
+    }
+
+    function finalize() {
+      setMetrics({
+        totalScanned,
+        candidatesFound,
+        outOfRange,
+        status: abortRef.current ? 'aborted' : 'completed',
+        progress: `${totalApiCalls}/${config.maxApiCalls}`,
+        apiCallsMade: totalApiCalls,
+        maxApiCalls: config.maxApiCalls,
+      });
+
+      addLog({
+        level: 'success',
+        message: `[COMPLETE] API: ${totalApiCalls} | Scanned: ${totalScanned} | Matches: ${candidatesFound} | Phases: PROBE→EXPLOIT→FINALIZE`,
+      });
+
+      addTelemetryLog({
+        source: 'SYSTEM',
+        type: 'RESPONSE',
+        message: `Sweep ${abortRef.current ? 'aborted' : 'completed'} via UCB1`,
+        payload: { totalApiCalls, totalScanned, candidatesFound, phases: ['PROBE', 'EXPLOIT', 'FINALIZE'] },
+      });
+
+      return { totalApiCalls, totalScanned, candidatesFound };
+    }
+
+    function selectProbeNodes(nodes: SearchNode[], count: number): SearchNode[] {
+      if (nodes.length <= count) return nodes;
+
+      const selected: SearchNode[] = [];
+      const step = Math.floor(nodes.length / count);
+
+      // Stratified sampling across the timeline
+      for (let i = 0; i < count; i++) {
+        const index = Math.min(i * step + Math.floor(step / 2), nodes.length - 1);
+        if (!selected.includes(nodes[index])) {
+          selected.push(nodes[index]);
+        }
+      }
+
+      return selected;
+    }
+
   }, [ticket, config, setMetrics, addLog, addFlightResult, clearLogs, clearFlightResults, addTelemetryLog]);
 
   const abort = useCallback(() => {

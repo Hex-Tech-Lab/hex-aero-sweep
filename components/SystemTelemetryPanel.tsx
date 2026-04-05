@@ -5,7 +5,7 @@ import { useTelemetryStore, LogType } from '@/src/store/useTelemetryStore';
 import { ChevronDown, ChevronUp, Trash2, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export function SystemTelemetryPanel() {
+export function SystemTelemetryPanel({ className }: { className?: string }) {
   const { logs, isVisible, isExpanded, toggleVisibility, clearLogs, toggleExpanded } = useTelemetryStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +60,7 @@ export function SystemTelemetryPanel() {
   };
 
   return (
-    <div className={`shrink-0 transition-[height] duration-300 ease-in-out bg-slate-900 border-t border-slate-800 ${panelHeight} ${!isExpanded ? 'overflow-hidden' : ''}`}>
+    <div className={`shrink-0 transition-[height] duration-300 ease-in-out bg-slate-900 border-t border-slate-800 ${panelHeight} ${!isExpanded ? 'overflow-hidden' : ''} ${className || ''}`}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-900 shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />

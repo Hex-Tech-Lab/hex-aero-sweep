@@ -114,10 +114,12 @@ export function HeuristicPathChart() {
               dataKey="nights"
               stroke="#e5e7eb"
               style={{ fontSize: '8px', fill: '#e5e7eb' }}
-              domain={['dataMin - 1', 'dataMax + 1']}
+              domain={['dataMin - 0.5', 'dataMax + 0.5']}
               type="number"
-              tickCount={8}
+              tickCount={chartData.length}
               allowDecimals={false}
+              interval={0}
+              tickFormatter={(val) => `${val}N`}
             />
             <YAxis
               dataKey="avgYield"

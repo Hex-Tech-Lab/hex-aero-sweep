@@ -92,14 +92,15 @@ type FlightRowProps = {
   
   const keyConditions = (() => {
     const bags = flight.metadata?.baggage || '1 PC';
+    const parsedBags = parseInt(bags) || 0;
     const brandLower = (fb || '').toLowerCase();
     if (brandLower.includes('flex') || brandLower.includes('business')) {
       return 'Unlimited';
     }
     if (brandLower.includes('family') || brandLower.includes('plus')) {
-      return `${bags}, Free`;
+      return parsedBags > 0 ? `${parsedBags}x 23kg Checked Bag` : '0 Checked Bags (Cabin Only)';
     }
-    return bags;
+    return parsedBags > 0 ? `${parsedBags}x 23kg Checked Bag` : '0 Checked Bags (Cabin Only)';
   })();
   
   return (
@@ -121,7 +122,7 @@ type FlightRowProps = {
       )}
     >
       <TableCell className={cn('font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
-        {flight.carrier}
+        <span title={CARRIER_NAMES[flight.carrier] || flight.carrier}>{flight.carrier}</span>
       </TableCell>
       <TableCell className={cn('font-mono text-[10px] px-1', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
         {formatOutboundDate(flight)}
@@ -142,15 +143,16 @@ type FlightRowProps = {
       <TableCell className="px-1">
         <Badge
           variant={fb !== 'Standard' ? 'default' : 'outline'}
+          title={fb}
           className={cn(
-            'text-[7px] py-0 px-1',
+            'text-[8px] py-0 px-1.5 font-medium',
             fb === 'Light' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
             fb === 'Flex' && 'bg-blue-500/20 text-blue-400 border-blue-500/30',
             fb === 'Plus' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
             fb === 'Standard' && 'text-slate-500 border-slate-600/30'
           )}
         >
-          {fb === 'Light' ? 'Lt' : fb === 'Flex' ? 'Fx' : fb === 'Plus' ? 'Pl' : fb === 'Family' ? 'Fm' : 'Std'}
+          {fb}
         </Badge>
       </TableCell>
       <TableCell className="text-center px-1">
@@ -515,7 +517,7 @@ export function FlightDataTable() {
                 Price<SortIcon columnKey="price" />
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-1" onClick={() => handleSort('yieldDelta')}>
-                Yield<SortIcon columnKey="yieldDelta" />
+                Diff<SortIcon columnKey="yieldDelta" />
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Status</TableHead>
             </TableRow>
@@ -622,10 +624,11 @@ export function FlightDataTable() {
                   <Plane className="w-6 h-6 text-cyan-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg font-bold text-slate-100 truncate">
-                      {selectedFlight.carrier}
-                    </h2>
+                  <h2 className="text-2xl font-bold text-slate-100 truncate">
+                    {carrierName(selectedFlight.carrier)}
+                  </h2>
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <span className="text-sm font-mono text-slate-400">{selectedFlight.carrier}</span>
                     <Badge
                       className={cn(
                         'text-xs shrink-0',
@@ -638,7 +641,6 @@ export function FlightDataTable() {
                       {fareBrand(selectedFlight)}
                     </Badge>
                   </div>
-                  <p className="text-xs text-slate-500 truncate">{carrierName(selectedFlight.carrier)}</p>
                 </div>
               </div>
 
@@ -675,9 +677,13 @@ export function FlightDataTable() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
                     <span className="text-slate-400 text-xs">Baggage</span>
-                    <span className="text-slate-300 text-xs font-mono text-center">1 PC</span>
+                    <span className="text-slate-300 text-xs font-mono text-center">1x 23kg</span>
                     <span className={cn('text-xs font-mono text-center truncate', selectedFlight.metadata?.baggage === '0 PC' ? 'text-red-400' : 'text-slate-300')}>
-                      {selectedFlight.metadata?.baggage || '1 PC'}
+                      {(() => {
+                        const bags = selectedFlight.metadata?.baggage || '1 PC';
+                        const parsedBags = parseInt(bags) || 0;
+                        return parsedBags > 0 ? `${parsedBags}x 23kg Checked Bag` : '0 Checked Bags (Cabin Only)';
+                      })()}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
@@ -686,9 +692,9 @@ export function FlightDataTable() {
                     <span className="text-slate-300 text-xs font-mono text-center">{selectedFlight.metadata?.bookingClass || 'Y'}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center bg-slate-900/50">
-                    <span className="text-slate-400 text-xs font-semibold">Yield Delta</span>
+                    <span className="text-slate-400 text-xs font-semibold">{selectedFlight.yieldDelta < 0 ? 'Total Savings' : 'Total Premium'}</span>
                     <span className="text-slate-500 text-xs text-center">—</span>
-                    <span className={cn('text-xs font-mono text-center font-bold truncate', getStatusColor(selectedFlight.yieldDelta))}>
+                    <span className={cn('text-xs font-mono text-center font-bold truncate', selectedFlight.yieldDelta < 0 ? 'text-emerald-400' : 'text-red-400')}>
                       {selectedFlight.yieldDelta >= 0 ? '+' : ''}${selectedFlight.yieldDelta.toFixed(2)}
                     </span>
                   </div>
@@ -697,7 +703,7 @@ export function FlightDataTable() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-slate-950 border border-slate-800 rounded-sm p-3">
-                  <p className="text-[10px] text-cyan-400 uppercase mb-1 font-semibold tracking-wider">Outbound</p>
+                  <p className="text-[10px] text-cyan-400 uppercase mb-2 font-semibold tracking-wider">Outbound</p>
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-sm font-mono font-bold text-slate-100 truncate">
                       {formatOutboundTime(selectedFlight).split('→')[0]}
@@ -707,18 +713,27 @@ export function FlightDataTable() {
                       {formatOutboundTime(selectedFlight).split('→')[1]}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1 truncate">
+                  <p className="text-[10px] text-slate-500 mt-2 truncate">
                     {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.origin || 'N/A'} → {(selectedFlight as FlightWithSegments).outboundSegments?.[0]?.destination || 'N/A'}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">{formatOutboundDate(selectedFlight)}</p>
                 </div>
 
                 <div className="bg-slate-950 border border-slate-800 rounded-sm p-3">
-                  <p className="text-[10px] text-cyan-400 uppercase mb-1 font-semibold tracking-wider">Return</p>
-                  <p className="text-sm font-mono font-bold text-slate-100 truncate">
-                    {selectedFlight.returnDate}
+                  <p className="text-[10px] text-cyan-400 uppercase mb-2 font-semibold tracking-wider">Return</p>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-sm font-mono font-bold text-slate-100 truncate">
+                      {formatInboundTime(selectedFlight).split('→')[0]}
+                    </span>
+                    <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                    <span className="text-sm font-mono font-bold text-slate-100 truncate">
+                      {formatInboundTime(selectedFlight).split('→')[1]}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2 truncate">
+                    {(selectedFlight as FlightWithSegments).inboundSegments?.[0]?.origin || 'N/A'} → {(selectedFlight as FlightWithSegments).inboundSegments?.[0]?.destination || 'N/A'}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">{selectedFlight.nights} nights</p>
+                  <p className="text-xs text-slate-400 mt-1">{formatInboundDate(selectedFlight)}</p>
                 </div>
               </div>
 
@@ -743,8 +758,11 @@ export function FlightDataTable() {
 
               <div className="flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-sm p-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="text-xs text-slate-400 truncate">{selectedFlight.metadata?.phase || selectedFlight.status}</span>
+                  <span className="relative flex h-2 w-2 mr-1">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-400 tracking-wider">LIVE API</span>
                 </div>
                 {getStatusBadge(selectedFlight.status)}
               </div>

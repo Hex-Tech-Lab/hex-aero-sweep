@@ -395,7 +395,10 @@ export async function searchDuffelOffers(params: {
       const price = parseFloat(offer.total_amount);
       let yieldDelta = price - params.baseCost;
 
-      const offerBookingClass = outboundSlice.fare_brand_name || offer.cabin_class || 'Y';
+      // Extract booking class from fare_basis_code (e.g., "YRV5" -> "Y", "TL15" -> "T")
+      const firstSegment = outboundSlice.segments?.[0];
+      const fareBasisCode = firstSegment?.passengers?.[0]?.fare_basis_code || firstSegment?.fare_basis_code || '';
+      const offerBookingClass = fareBasisCode.charAt(0) || 'Y';
       const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass, params.originalTicket?.departureDate);
       yieldDelta += farePenalty;
 
