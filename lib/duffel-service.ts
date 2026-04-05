@@ -2,6 +2,10 @@ import { Duffel } from '@duffel/api';
 
 const DUFFEL_API_TIMEOUT_MS = 10000;
 
+// TODO: @duffel/api SDK internally uses deprecated url.parse() (DEP0169)
+// This warning originates from node_modules/@duffel/api, not our application code.
+// Cannot be fixed directly - requires Duffel SDK update.
+
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
