@@ -17,8 +17,8 @@ export function SystemTelemetryPanel({ className }: { className?: string }) {
 
   if (!isVisible) return null;
 
-  const panelHeight = isExpanded ? 'h-64' : 'h-12';
-  const innerOverflow = isExpanded ? 'overflow-y-auto' : '';
+  const panelHeight = isExpanded ? 'h-[40vh]' : 'h-12';
+  const innerOverflow = isExpanded ? 'max-h-[40vh] overflow-y-auto' : '';
 
   const getLogColor = (type: LogType): string => {
     switch (type) {

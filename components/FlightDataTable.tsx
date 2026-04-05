@@ -578,7 +578,7 @@ export function FlightDataTable() {
       </div>
 
       {totalPages > 1 && (
-        <div className="p-2 border-t border-slate-800 flex items-center justify-between">
+        <div className="p-2 border-t border-slate-800 flex items-center justify-between shrink-0">
           <span className="text-[10px] text-slate-500">
             Page {currentPage}/{totalPages}
           </span>

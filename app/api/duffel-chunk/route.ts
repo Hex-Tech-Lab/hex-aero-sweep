@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        const filteredCandidates = result.candidates.filter(c => c.price <= maxAcceptablePrice);
+        const filteredCandidates = result.candidates.filter(c => {
+          const trueCost = c.price + (c.metadata?.tierPenalty || 0);
+          return trueCost <= maxAcceptablePrice;
+        });
         
         const response = {
           candidates: filteredCandidates,

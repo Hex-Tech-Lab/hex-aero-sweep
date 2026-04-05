@@ -262,7 +262,85 @@ export function useClientSweep() {
       return finalize();
     }
 
-    // Phase 3: FINALIZE - Deep search on top matches for exact comparison
+    // Phase 3: DEEP SCATTER - Randomly sample unexplored weeks across entire timeline
+    const scatterBudget = config.maxApiCalls - totalApiCalls;
+    
+    if (scatterBudget > 0) {
+      addLog({ level: 'info', message: `[SCATTER PHASE] Budget: ${scatterBudget} calls | Exploring unexplored weeks...` });
+      
+      const unexploredNodes = searchNodes.filter(n => !n.explored);
+      if (unexploredNodes.length > 0) {
+        // Group by week to ensure even coverage across timeline
+        const weekSize = Math.max(7, Math.floor(searchNodes.length / 50));
+        const weekGroups: Map<number, SearchNode[]> = new Map();
+        
+        unexploredNodes.forEach(node => {
+          const nodeIndex = searchNodes.indexOf(node);
+          const weekIndex = Math.floor(nodeIndex / weekSize);
+          if (!weekGroups.has(weekIndex)) weekGroups.set(weekIndex, []);
+          weekGroups.get(weekIndex)!.push(node);
+        });
+        
+        // Pick one random node from each week group until budget exhausted
+        const weekIndices = Array.from(weekGroups.keys()).sort(() => Math.random() - 0.5);
+        const scatterBatch: SearchNode[] = [];
+        
+        for (const wIdx of weekIndices) {
+          const weekNodes = weekGroups.get(wIdx)!;
+          const randomNode = weekNodes[Math.floor(Math.random() * weekNodes.length)];
+          scatterBatch.push(randomNode);
+          if (scatterBatch.length >= scatterBudget) break;
+        }
+        
+        if (scatterBatch.length > 0) {
+          addLog({ level: 'info', message: `[SCATTER] Sampling ${scatterBatch.length} nodes across ${weekGroups.size} week groups` });
+          
+          const scatterChunks = chunkArray(scatterBatch, CHUNK_SIZE);
+          for (let i = 0; i < scatterChunks.length && !signal.aborted; i++) {
+            const chunk = scatterChunks[i];
+            const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+            
+            if (signal.aborted) break;
+            
+            totalApiCalls += result.apiCalls;
+            totalScanned += result.scanned;
+            outOfRange += result.rejected;
+            candidatesFound += result.candidates.length;
+            
+            for (const candidate of result.candidates) {
+              const node = searchNodes.find(n => n.departureDate === candidate.departureDate && n.returnDate === candidate.returnDate);
+              if (node) {
+                node.count++;
+                node.totalReward += (baseCost - candidate.price);
+                node.bestPrice = Math.min(node.bestPrice, candidate.price);
+                node.avgPrice = node.totalReward / node.count;
+                node.explored = true;
+              }
+              addLog({
+                level: 'success',
+                message: `[SCATTER MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
+              } as any);
+              addFlightResult(candidate);
+            }
+            
+            updateMetrics();
+            addLog({ level: 'info', message: `[SCATTER ${i + 1}/${scatterChunks.length}] Chunk complete | Found ${result.candidates.length} candidates` });
+            await new Promise(r => setTimeout(r, 50));
+          }
+        } else {
+          addLog({ level: 'info', message: '[SCATTER] No unexplored nodes remaining' });
+        }
+      } else {
+        addLog({ level: 'info', message: '[SCATTER] All nodes already explored' });
+      }
+    }
+
+    if (signal.aborted) {
+      addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted after SCATTER phase' });
+      return finalize();
+    }
+
+    // Phase 4: FINALIZE - Deep search on top matches for exact comparison
     const verifiedCandidates = searchNodes.filter(n => n.explored && n.bestPrice < maxAcceptablePrice);
     const topNodes = verifiedCandidates
       .sort((a, b) => a.bestPrice - b.bestPrice)
