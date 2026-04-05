@@ -167,12 +167,33 @@ function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string,
 }
 
 function calculateApplesToApplesPenalty(originalBrand: string, newBrand: string): number {
-  const PREMIUM_BRANDS = ['Family', 'Flex', 'Comfort'];
-  const isOriginalPremium = PREMIUM_BRANDS.some(b => originalBrand.toLowerCase().includes(b.toLowerCase()));
-  const isNewLight = newBrand.toLowerCase() === 'light';
+  // Brand Tier Mapping: Light=1, Classic=2, Flex/Family=3
+  const TIER_MAP: Record<string, number> = {
+    'light': 1,
+    'basic': 1,
+    'classic': 2,
+    'standard': 2,
+    'flex': 3,
+    'family': 3,
+    'plus': 3,
+    'comfort': 3,
+  };
   
-  if (isOriginalPremium && isNewLight) {
-    return 50.00;
+  const getTier = (brand: string): number => {
+    const lower = brand.toLowerCase();
+    for (const [key, tier] of Object.entries(TIER_MAP)) {
+      if (lower.includes(key)) return tier;
+    }
+    return 2; // Default to Classic tier
+  };
+  
+  const originalTier = getTier(originalBrand);
+  const newTier = getTier(newBrand);
+  
+  // Tier downgrade penalty: $150 for each tier level dropped
+  if (originalTier > newTier) {
+    const tierDrop = originalTier - newTier;
+    return tierDrop * 150.00;
   }
   return 0.00;
 }

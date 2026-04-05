@@ -41,21 +41,21 @@ const MetricBox = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'border border-slate-800 rounded-sm bg-slate-900/50 p-2',
+        'border border-slate-800 rounded-sm bg-slate-900/50 pt-4 pb-2 px-2',
         className
       )}
     >
-      <div className="flex items-center justify-between mb-0.5">
-        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-medium">
+      <div className="flex items-center justify-between">
+        <span className="text-[8px] text-slate-500 uppercase tracking-wider font-medium">
           {label}
         </span>
-        {Icon && <Icon className={cn('w-3 h-3', variantStyles[variant])} />}
+        {Icon && <Icon className={cn('w-2.5 h-2.5', variantStyles[variant])} />}
       </div>
-      <div className={cn('text-lg font-bold font-mono', variantStyles[variant])}>
+      <div className={cn('text-base font-bold font-mono', variantStyles[variant])}>
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
       {subValue && (
-        <div className="text-[9px] text-slate-600 font-mono">
+        <div className="text-[7px] text-slate-600 font-mono text-right">
           {subValue}
         </div>
       )}
@@ -94,9 +94,17 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
     ? Math.ceil((departureDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
+  // Search window dates from config
+  const searchStartDisplay = config.searchWindowStart 
+    ? new Date(config.searchWindowStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '--';
+  const searchEndDisplay = config.searchWindowEnd 
+    ? new Date(config.searchWindowEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '--';
+
   return (
     <div className="w-full px-4 py-2 space-y-2 max-w-[100vw] overflow-x-hidden">
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-9 gap-2 w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 w-full">
         <MetricBox
           label="Today"
           value={todayDisplay}
@@ -110,6 +118,18 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
           subValue={daysToDeparture !== null ? `${daysToDeparture}D` : ''}
           variant={isPreDeparture ? 'warning' : 'error'}
           icon={PlaneTakeoff}
+        />
+        <MetricBox
+          label="Search Start"
+          value={searchStartDisplay}
+          variant="info"
+          icon={Calendar}
+        />
+        <MetricBox
+          label="Search End"
+          value={searchEndDisplay}
+          variant="info"
+          icon={Calendar}
         />
         <MetricBox
           label="Est. Volume"

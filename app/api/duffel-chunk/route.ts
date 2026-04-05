@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
       departureDate: string;
     }[] = [];
 
-    for (const search of searches) {
+    // Parallel execution: process all searches simultaneously
+    const searchPromises = searches.map(async (search) => {
       try {
         const result = await searchDuffelOffers({
           origin,
@@ -67,22 +68,25 @@ export async function POST(request: NextRequest) {
 
         const filteredCandidates = result.candidates.filter(c => c.price <= maxAcceptablePrice);
         
-        results.push({
+        return {
           candidates: filteredCandidates,
           rawOffersCount: result.rawOffersCount,
           rejectedCount: result.rejectedCount,
           departureDate: search.departureDate,
-        });
+        };
       } catch (err) {
         console.error(`[Chunk API] Search failed for ${search.departureDate}:`, err);
-        results.push({
+        return {
           candidates: [],
           rawOffersCount: 0,
           rejectedCount: 0,
           departureDate: search.departureDate,
-        });
+        };
       }
-    }
+    });
+
+    const searchResults = await Promise.all(searchPromises);
+    results.push(...searchResults);
 
     return NextResponse.json({
       success: true,

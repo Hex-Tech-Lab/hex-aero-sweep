@@ -160,11 +160,34 @@ export function useClientSweep() {
       return finalize();
     }
 
-    // Phase 2: EXPLOIT - Focus on cheapest nodes using UCB1
+    // Phase 2: EXPLOIT - Focus on cheapest nodes using UCB1 + surrounding dates
     const remainingBudget = config.maxApiCalls - totalApiCalls;
     const exploitationBudget = Math.floor(remainingBudget * 0.7);
 
     addLog({ level: 'info', message: `[EXPLOIT PHASE] Budget: ${exploitationBudget} calls | Focusing on promising nodes via UCB1...` });
+
+    // Find best node from probe phase
+    const probedNodes = searchNodes.filter(n => n.explored);
+    const bestProbeNode = probedNodes.length > 0 
+      ? probedNodes.reduce((best, node) => node.bestPrice < best.bestPrice ? node : best, probedNodes[0])
+      : null;
+
+    // Add surrounding nodes (±10 days from best probe node)
+    if (bestProbeNode) {
+      const bestIndex = searchNodes.findIndex(n => 
+        n.departureDate === bestProbeNode.departureDate && n.returnDate === bestProbeNode.returnDate
+      );
+      const surroundRange = 10;
+      const surroundStart = Math.max(0, bestIndex - surroundRange);
+      const surroundEnd = Math.min(searchNodes.length - 1, bestIndex + surroundRange);
+      
+      for (let i = surroundStart; i <= surroundEnd; i++) {
+        if (!searchNodes[i].explored && searchNodes[i].count === 0) {
+          searchNodes[i].count = 0.5; // Give partial credit to prioritize
+        }
+      }
+      addLog({ level: 'info', message: `[EXPLOIT] Best probe: ${bestProbeNode.departureDate} | Surrounding ±${surroundRange} days prioritized` });
+    }
 
     let exploitCalls = 0;
     const parentVisits = totalApiCalls + 1;
@@ -360,14 +383,14 @@ export function useClientSweep() {
     function selectProbeNodes(nodes: SearchNode[], count: number): SearchNode[] {
       if (nodes.length <= count) return nodes;
 
+      // True UCB1 Sparse Probe: evenly spaced indices across the timeline
+      // Formula: filter nodes where index % Math.floor(totalNodes / probeCount) === 0
+      const step = Math.max(1, Math.floor(nodes.length / count));
       const selected: SearchNode[] = [];
-      const step = Math.floor(nodes.length / count);
-
-      // Stratified sampling across the timeline
-      for (let i = 0; i < count; i++) {
-        const index = Math.min(i * step + Math.floor(step / 2), nodes.length - 1);
-        if (!selected.includes(nodes[index])) {
-          selected.push(nodes[index]);
+      
+      for (let i = 0; i < nodes.length; i++) {
+        if (i % step === 0 && selected.length < count) {
+          selected.push(nodes[i]);
         }
       }
 
