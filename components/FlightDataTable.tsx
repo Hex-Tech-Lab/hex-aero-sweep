@@ -543,7 +543,7 @@ export function FlightDataTable() {
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">
-                      {filterText ? 'No matching results' : 'Awaiting Candidate Stream...'}
+                      {filterText ? 'No matching results' : (filteredAndSortedFlights.length === 0 ? '0 Matches Found. All scanned candidates were rejected by the Circuit Breaker.' : 'Awaiting Candidate Stream...')}
                     </span>
                   </div>
                 </TableCell>
@@ -696,20 +696,28 @@ export function FlightDataTable() {
                       {(() => {
                         const bags = selectedFlight.metadata?.baggage || '1 PC';
                         const parsedBags = parseInt(bags) || 0;
-                        return parsedBags > 0 ? `${parsedBags}x 23kg Checked Bag` : '0 Checked Bags (Cabin Only)';
+                        if (parsedBags === 0) return '0 Checked Bags (Cabin Only)';
+                        return `${parsedBags}x 23kg Checked Bag`;
                       })()}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center">
                     <span className="text-slate-400 text-xs">Booking Class</span>
                     <span className="text-slate-300 text-xs font-mono text-center">{(ticket as any).bookingClass || 'Y'}</span>
-                    <span className="text-slate-300 text-xs font-mono text-center">{selectedFlight.metadata?.bookingClass || 'Y'}</span>
+                    <span className="text-slate-300 text-xs font-mono text-center">
+                      {(() => {
+                        const bookingClass = selectedFlight.metadata?.bookingClass || 'Y';
+                        const fareBrand = selectedFlight.metadata?.fareBrand || selectedFlight.fareBrand || '';
+                        if (bookingClass === fareBrand || bookingClass.length > 5) return 'Economy';
+                        return bookingClass;
+                      })()}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 items-center bg-slate-900/50">
                     <span className="text-slate-400 text-xs font-semibold">{selectedFlight.yieldDelta < 0 ? 'Total Savings' : 'Total Premium'}</span>
                     <span className="text-slate-500 text-xs text-center">—</span>
                     <span className={cn('text-xs font-mono text-center font-bold truncate', selectedFlight.yieldDelta < 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {selectedFlight.yieldDelta >= 0 ? '+' : ''}${selectedFlight.yieldDelta.toFixed(2)}
+                      {selectedFlight.yieldDelta >= 0 ? '+' : ''}${Math.abs(selectedFlight.yieldDelta).toFixed(2)} Price Difference
                     </span>
                   </div>
                 </div>

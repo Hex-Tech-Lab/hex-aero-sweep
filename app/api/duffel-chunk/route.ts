@@ -116,10 +116,26 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        const filteredCandidates = result.candidates.filter(c => {
-          const trueCost = c.price + (c.metadata?.tierPenalty || 0);
-          return trueCost <= maxAcceptablePrice;
-        });
+        const filteredCandidates: FlightCandidate[] = [];
+        const rejectedByBreaker: { carrier: string; departureDate: string; trueCost: number; tierPenalty: number }[] = [];
+        
+        for (const candidate of result.candidates) {
+          const tierPenalty = candidate.metadata?.tierPenalty || 0;
+          const trueCost = candidate.price + tierPenalty;
+          
+          if (trueCost <= maxAcceptablePrice) {
+            filteredCandidates.push(candidate);
+          } else if (tierPenalty > 0) {
+            rejectedByBreaker.push({ carrier: candidate.carrier, departureDate: candidate.departureDate, trueCost, tierPenalty });
+          }
+        }
+        
+        if (rejectedByBreaker.length > 0) {
+          console.warn(`[INCINERATOR] ${rejectedByBreaker.length} candidates rejected by Circuit Breaker due to tier penalties`);
+          rejectedByBreaker.slice(0, 3).forEach(r => {
+            console.warn(`[REJECTED] ${r.carrier} ${r.departureDate} | True Cost $${r.trueCost.toFixed(2)} exceeds target due to +$${r.tierPenalty.toFixed(0)} tier penalty`);
+          });
+        }
         
         const response = {
           candidates: filteredCandidates,
