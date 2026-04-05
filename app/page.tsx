@@ -7,6 +7,7 @@ import { WizardNav } from '@/components/WizardNav';
 import { IntakeStep } from '@/components/IntakeStep';
 import { ConfigStep } from '@/components/ConfigStep';
 import { ExecutionStep } from '@/components/ExecutionStep';
+import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -41,7 +42,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col pb-0 max-w-[100vw] overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col max-w-[100vw] overflow-x-hidden pb-20">
       <GlobalHeader
         currentStep={currentStep}
         onBack={() => setCurrentStep(Math.max(1, currentStep - 1))}
@@ -69,6 +70,10 @@ export default function Home() {
       {currentStep === 3 && (
         <ExecutionStep onBack={() => setCurrentStep(2)} />
       )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        <SystemTelemetryPanel />
+      </div>
     </div>
   );
 }

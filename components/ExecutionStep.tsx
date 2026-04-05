@@ -3,9 +3,7 @@
 import { useMemo } from 'react';
 import type { ElementType } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
-import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import { TerminalOutput } from '@/components/TerminalOutput';
-import { SystemTelemetryPanel } from '@/components/SystemTelemetryPanel';
 import { FlightDataTable } from '@/components/FlightDataTable';
 import { VolatilityChart } from '@/components/VolatilityChart';
 import { HeuristicPathChart } from '@/components/HeuristicPathChart';
@@ -67,7 +65,6 @@ const MetricBox = ({
 
 export function ExecutionStep({ onBack }: { onBack: () => void }) {
   const { metrics, config, flightResults, ticket } = useTicketStore();
-  const { isVisible: telemetryVisible } = useTelemetryStore();
 
   const verifiedResults = flightResults.filter(f => f.status === 'verified');
   const validCandidates = metrics.candidatesFound || verifiedResults.length || 0;
@@ -168,11 +165,8 @@ export function ExecutionStep({ onBack }: { onBack: () => void }) {
 
       <FlightDataTable />
 
-      <div className="grid h-[35vh] w-full bg-slate-950 border-t border-slate-800" style={{ gridTemplateRows: '1fr auto' }}>
-        <div className="min-h-0 overflow-y-auto p-4">
-          <TerminalOutput />
-        </div>
-        <SystemTelemetryPanel className="transition-all duration-300 ease-in-out bg-slate-900 border-t border-slate-800" />
+      <div className="h-[35vh] w-full bg-slate-950 border-t border-slate-800 overflow-hidden">
+        <TerminalOutput />
       </div>
     </div>
   );

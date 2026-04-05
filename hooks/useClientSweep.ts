@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 
-const CHUNK_SIZE = 12;
+const CHUNK_SIZE = 4;
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
@@ -36,7 +36,7 @@ interface SearchNode {
 }
 
 export function useClientSweep() {
-  const abortRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const {
     ticket,
@@ -50,8 +50,15 @@ export function useClientSweep() {
 
   const { addLog: addTelemetryLog } = useTelemetryStore();
 
+  const abort = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
   const runSweep = useCallback(async () => {
-    abortRef.current = false;
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
 
     const baseCost = ticket.baseCost || 792.87;
     const maxAcceptablePrice = baseCost + config.priceTolerance;
@@ -115,9 +122,11 @@ export function useClientSweep() {
     addLog({ level: 'info', message: `[PROBE PHASE] Sampling ${probeNodes.length} strategic nodes across timeline...` });
 
     const probeChunks = chunkArray(probeNodes, CHUNK_SIZE);
-    for (let i = 0; i < probeChunks.length && !abortRef.current; i++) {
+    for (let i = 0; i < probeChunks.length && !signal.aborted; i++) {
       const chunk = probeChunks[i];
       const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+
+      if (signal.aborted) break;
 
       totalApiCalls += result.apiCalls;
       totalScanned += result.scanned;
@@ -146,7 +155,7 @@ export function useClientSweep() {
       await new Promise(r => setTimeout(r, 50));
     }
 
-    if (abortRef.current) {
+    if (signal.aborted) {
       addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted after PROBE phase' });
       return finalize();
     }
@@ -160,7 +169,7 @@ export function useClientSweep() {
     let exploitCalls = 0;
     const parentVisits = totalApiCalls + 1;
 
-    while (exploitCalls < exploitationBudget && !abortRef.current) {
+    while (exploitCalls < exploitationBudget && !signal.aborted) {
       // Rank unexplored nodes by UCB1 score
       const rankedNodes = searchNodes
         .filter(n => !n.explored)
@@ -177,6 +186,8 @@ export function useClientSweep() {
       const batch = rankedNodes.slice(0, batchSize).map(r => r.node);
 
       const result = await processChunk(batch, baseCost, maxAcceptablePrice, ticket, config);
+
+      if (signal.aborted) break;
 
       totalApiCalls += result.apiCalls;
       exploitCalls += result.apiCalls;
@@ -209,7 +220,7 @@ export function useClientSweep() {
       await new Promise(r => setTimeout(r, 50));
     }
 
-    if (abortRef.current) {
+    if (signal.aborted) {
       addLog({ level: 'warning', message: '[SYSTEM] Sweep aborted after EXPLOIT phase' });
       return finalize();
     }
@@ -224,9 +235,11 @@ export function useClientSweep() {
       addLog({ level: 'info', message: `[FINALIZE PHASE] Deep search on ${topNodes.length} top candidates for exact mapping...` });
 
       const finalizeChunks = chunkArray(topNodes, CHUNK_SIZE);
-      for (let i = 0; i < finalizeChunks.length && !abortRef.current; i++) {
+      for (let i = 0; i < finalizeChunks.length && !signal.aborted; i++) {
         const chunk = finalizeChunks[i];
         const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+
+        if (signal.aborted) break;
 
         totalApiCalls += result.apiCalls;
         totalScanned += result.scanned;
@@ -255,6 +268,10 @@ export function useClientSweep() {
       ticket: any,
       config: any
     ): Promise<{ apiCalls: number; scanned: number; rejected: number; candidates: any[] }> {
+      if (signal.aborted) {
+        return { apiCalls: 0, scanned: 0, rejected: 0, candidates: [] };
+      }
+
       const searches = nodes.map(n => ({ departureDate: n.departureDate, returnDate: n.returnDate }));
 
       try {
@@ -314,11 +331,12 @@ export function useClientSweep() {
     }
 
     function finalize() {
+      const finalStatus = signal.aborted ? 'aborted' : 'completed';
       setMetrics({
         totalScanned,
         candidatesFound,
         outOfRange,
-        status: abortRef.current ? 'aborted' : 'completed',
+        status: finalStatus,
         progress: `${totalApiCalls}/${config.maxApiCalls}`,
         apiCallsMade: totalApiCalls,
         maxApiCalls: config.maxApiCalls,
@@ -332,7 +350,7 @@ export function useClientSweep() {
       addTelemetryLog({
         source: 'SYSTEM',
         type: 'RESPONSE',
-        message: `Sweep ${abortRef.current ? 'aborted' : 'completed'} via UCB1`,
+        message: `Sweep ${finalStatus} via UCB1`,
         payload: { totalApiCalls, totalScanned, candidatesFound, phases: ['PROBE', 'EXPLOIT', 'FINALIZE'] },
       });
 
@@ -357,10 +375,6 @@ export function useClientSweep() {
     }
 
   }, [ticket, config, setMetrics, addLog, addFlightResult, clearLogs, clearFlightResults, addTelemetryLog]);
-
-  const abort = useCallback(() => {
-    abortRef.current = true;
-  }, []);
 
   return { runSweep, abort };
 }

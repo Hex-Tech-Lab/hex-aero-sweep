@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type LogSource = 'OPENROUTER' | 'DUFFEL' | 'SYSTEM';
 export type LogType = 'REQUEST' | 'RESPONSE' | 'ERROR' | 'INFO';
@@ -27,30 +28,42 @@ interface TelemetryState {
   toggleExpanded: () => void;
 }
 
-export const useTelemetryStore = create<TelemetryState>()((set) => ({
-  logs: [],
-  isVisible: true,
-  isExpanded: false,
+export const useTelemetryStore = create<TelemetryState>()(
+  persist(
+    (set) => ({
+      logs: [],
+      isVisible: true,
+      isExpanded: false,
 
-  addLog: (log) => {
-    const entry: LogEntry = {
-      ...log,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-    };
+      addLog: (log) => {
+        const entry: LogEntry = {
+          ...log,
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+        };
 
-    set((state) => ({
-      logs: [...state.logs, entry],
-    }));
+        set((state) => ({
+          logs: [...state.logs, entry],
+        }));
 
-    console.log(`[TELEMETRY] ${entry.source} ${entry.type}:`, entry.message || '', entry.payload);
-  },
+        console.log(`[TELEMETRY] ${entry.source} ${entry.type}:`, entry.message || '', entry.payload);
+      },
 
-  clearLogs: () => set({ logs: [] }),
+      clearLogs: () => set({ logs: [] }),
 
-  toggleVisibility: () => set((state) => ({ isVisible: !state.isVisible })),
+      toggleVisibility: () => set((state) => ({ isVisible: !state.isVisible })),
 
-  setVisibility: (visible) => set({ isVisible: visible }),
+      setVisibility: (visible) => set({ isVisible: visible }),
 
-  toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
-}));
+      toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
+    }),
+    {
+      name: 'aerosweep-telemetry-store',
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => ({
+        isVisible: state.isVisible,
+        isExpanded: state.isExpanded,
+      }),
+    }
+  )
+);

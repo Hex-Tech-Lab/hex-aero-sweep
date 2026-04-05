@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type TicketData = {
   pnr: string;
@@ -133,7 +134,9 @@ const initialMetrics: ExecutionMetrics = {
 
 const MAX_LOGS = 500;
 
-export const useTicketStore = create<TicketStore>()((set, get) => ({
+export const useTicketStore = create<TicketStore>()(
+  persist(
+    (set, get) => ({
   ticket: initialTicket,
   config: initialConfig,
   metrics: initialMetrics,
@@ -269,4 +272,16 @@ export const useTicketStore = create<TicketStore>()((set, get) => ({
       hasValidApiCalls
     );
   },
-}));
+}),
+{
+  name: 'aerosweep-ticket-store',
+  storage: createJSONStorage(() => sessionStorage),
+  partialize: (state) => ({
+    ticket: state.ticket,
+    config: state.config,
+    metrics: state.metrics,
+    flightResults: state.flightResults,
+    currentStep: state.currentStep,
+  }),
+}
+));
