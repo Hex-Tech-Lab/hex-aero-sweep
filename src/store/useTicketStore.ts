@@ -22,6 +22,18 @@ export type TicketData = {
     luggage: string;
     cancellation: string;
   };
+  // Airline Intelligence Schema fields
+  carrier?: string; // IATA code e.g., 'A3'
+  origin?: string;   // IATA origin e.g., 'CAI'
+  destination?: string; // IATA destination e.g., 'ATH'
+  bookingClass?: string; // Raw booking class from ticket e.g., 'K'
+  // Fare Family Resolution
+  fareFamilyId?: string | null;
+  fareFamilyName?: string | null;
+  parityTier?: number | null;
+  isDomestic?: boolean;
+  anchorTier?: number; // The parity_tier used as anchor for comparisons
+  dbTicketId?: string; // Reference to tickets table
 };
 
 export type ConfigData = {
@@ -77,6 +89,7 @@ type TicketStore = {
   flightResults: FlightResult[];
   currentStep: number;
   sweepExecutionId: string | null;
+  searchJobId: string | null; // Airline schema search job ID
 
   setTicket: (ticket: Partial<TicketData>) => void;
   setConfig: (config: Partial<ConfigData>) => void;
@@ -87,6 +100,8 @@ type TicketStore = {
   clearFlightResults: () => void;
   setCurrentStep: (step: number) => void;
   setSweepExecutionId: (id: string | null) => void;
+  setSearchJobId: (id: string | null) => void;
+  setFareFamily: (fareFamilyId: string | null, fareFamilyName: string | null, parityTier: number | null, isDomestic: boolean | undefined) => void;
   resetStore: () => void;
   isTicketExpired: () => boolean;
   isTicketValid: () => boolean;
@@ -144,6 +159,7 @@ export const useTicketStore = create<TicketStore>()(
   flightResults: [],
   currentStep: 1,
   sweepExecutionId: null,
+  searchJobId: null,
 
   setTicket: (ticket) =>
     set((state) => ({
@@ -190,6 +206,20 @@ export const useTicketStore = create<TicketStore>()(
 
   setSweepExecutionId: (id) => set({ sweepExecutionId: id }),
 
+  setSearchJobId: (id) => set({ searchJobId: id }),
+
+  setFareFamily: (fareFamilyId, fareFamilyName, parityTier, isDomestic) =>
+    set((state) => ({
+      ticket: {
+        ...state.ticket,
+        fareFamilyId,
+        fareFamilyName,
+        parityTier,
+        isDomestic,
+        anchorTier: parityTier ?? undefined,
+      },
+    })),
+
   resetStore: () =>
     set({
       ticket: initialTicket,
@@ -205,6 +235,7 @@ export const useTicketStore = create<TicketStore>()(
       flightResults: [],
       currentStep: 1,
       sweepExecutionId: null,
+      searchJobId: null,
     }),
 
   isTicketExpired: () => {

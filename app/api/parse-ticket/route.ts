@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pdf from 'pdf-parse';
 import { extractTCData } from '@/lib/openrouter-service';
+import { resolveFareFamily } from '@/lib/supabase';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const CARRIER_NAME_TO_IATA: Record<string, string> = {
+  'aegean airlines': 'A3',
+  'aegean': 'A3',
+  'olympic air': 'OA',
+  'olympic': 'OA',
+  'star air': 'ST',
+  'sky express': 'G3',
+  'ryanair': 'FR',
+  'easyjet': 'U2',
+  'lufthansa': 'LH',
+  'lh': 'LH',
+  'austrian': 'OS',
+  'swiss': 'LX',
+  'brussels airlines': 'SN',
+  'a3': 'A3',
+  'oa': 'OA',
+  'g3': 'G3',
+};
+
+function extractCarrierIata(carrierName?: string): string | null {
+  if (!carrierName) return null;
+  const normalized = carrierName.toLowerCase().trim();
+  return CARRIER_NAME_TO_IATA[normalized] || null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -102,12 +128,53 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Phase 5: Resolve Fare Family via Airline Intelligence Schema
+      const carrierIata = extractCarrierIata(llmResult.data.carrierName);
+      const originIata = llmResult.data.departureAirport?.toUpperCase();
+      const destIata = llmResult.data.arrivalAirport?.toUpperCase();
+      const bookingClass = llmResult.data.fareClass?.charAt(0).toUpperCase() || 'Y';
+
+      let fareFamilyResult = null;
+      
+      if (carrierIata && originIata && destIata) {
+        console.log(`[Airline Schema] Resolving fare family: carrier=${carrierIata}, class=${bookingClass}, route=${originIata}-${destIata}`);
+        
+        fareFamilyResult = await resolveFareFamily({
+          p_carrier_iata: carrierIata,
+          p_booking_class: bookingClass,
+          p_origin_iata: originIata,
+          p_dest_iata: destIata,
+        });
+
+        if (fareFamilyResult) {
+          console.log(`[Airline Schema] ✓ Fare Family resolved: ${fareFamilyResult.fare_family_name} (Tier ${fareFamilyResult.parity_tier})`);
+        } else {
+          console.warn(`[Airline Schema] Fare family resolution returned null - using default tier`);
+        }
+      } else {
+        console.warn(`[Airline Schema] Skipping fare family resolution - missing carrier=${carrierIata}, origin=${originIata}, dest=${destIata}`);
+      }
+
       return NextResponse.json({
         success: true,
         data: llmResult.data,
         metadata: {
           modelUsed: llmResult.modelUsed,
           latencyMs: llmResult.telemetry?.latencyMs,
+        },
+        airlineIntelligence: {
+          carrier: carrierIata,
+          origin: originIata,
+          destination: destIata,
+          bookingClass,
+          fareFamily: fareFamilyResult ? {
+            fareFamilyId: fareFamilyResult.fare_family_id,
+            fareFamilyName: fareFamilyResult.fare_family_name,
+            parityTier: fareFamilyResult.parity_tier,
+            baseFareUsd: fareFamilyResult.base_fare_usd,
+            isDomestic: fareFamilyResult.is_domestic,
+            cabin: fareFamilyResult.cabin,
+          } : null,
         },
       });
 

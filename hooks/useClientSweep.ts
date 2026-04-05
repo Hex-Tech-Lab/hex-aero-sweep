@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
+import { createSearchJob, updateSearchJob, insertSweepExecution } from '@/lib/supabase';
 
 const CHUNK_SIZE = 4;
 
@@ -46,6 +47,8 @@ export function useClientSweep() {
     addFlightResult,
     clearLogs,
     clearFlightResults,
+    setSweepExecutionId,
+    setSearchJobId,
   } = useTicketStore();
 
   const { addLog: addTelemetryLog } = useTelemetryStore();
@@ -73,6 +76,54 @@ export function useClientSweep() {
 
     addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
     addLog({ level: 'info', message: `[SYSTEM] Budget: ${config.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
+
+    // Phase 0: Initialize Search Job in Airline Intelligence Schema
+    let searchJobId: string | null = null;
+    let sweepExecutionId: string | null = null;
+
+    try {
+      addLog({ level: 'info', message: '[JOB INIT] Creating search job in Airline Intelligence Schema...' });
+
+      const searchWindowStart = config.searchWindowStart ? new Date(config.searchWindowStart).toISOString().split('T')[0] : '';
+      const searchWindowEnd = config.searchWindowEnd ? new Date(config.searchWindowEnd).toISOString().split('T')[0] : '';
+
+      const jobResult = await createSearchJob({
+        p_ticket_id: ticket.dbTicketId || '',
+        p_pnr: ticket.pnr,
+        p_carrier_iata: ticket.carrier || 'A3',
+        p_booking_class: ticket.bookingClass || 'Y',
+        p_fare_family_id: ticket.fareFamilyId || null,
+        p_parity_tier: ticket.parityTier || null,
+        p_anchor_base_cost: baseCost,
+        p_search_window_start: searchWindowStart,
+        p_search_window_end: searchWindowEnd,
+        p_min_nights: config.minNights,
+        p_max_nights: config.maxNights,
+        p_price_tolerance: Number(config.priceTolerance),
+        p_max_api_calls: config.maxApiCalls,
+      });
+
+      if (jobResult) {
+        searchJobId = jobResult.id;
+        sweepExecutionId = jobResult.sweep_execution_id;
+        setSearchJobId(searchJobId);
+        setSweepExecutionId(sweepExecutionId);
+        addLog({ level: 'success', message: `[JOB INIT] ✓ Search Job created: ${searchJobId}` });
+        addLog({ level: 'info', message: `[JOB INIT] Sweep Execution ID: ${sweepExecutionId}` });
+        addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${ticket.parityTier || 'default'} | Fare Family: ${ticket.fareFamilyName || 'unknown'}` });
+      } else {
+        addLog({ level: 'warning', message: '[JOB INIT] Failed to create search job in DB - continuing in local mode' });
+        // Fallback: create local sweep execution ID
+        const localExecId = `local-${Date.now()}`;
+        setSweepExecutionId(localExecId);
+        addLog({ level: 'info', message: `[JOB INIT] Using local execution ID: ${localExecId}` });
+      }
+    } catch (jobError) {
+      console.error('[JOB INIT] Error creating search job:', jobError);
+      addLog({ level: 'warning', message: '[JOB INIT] Exception creating search job - continuing in local mode' });
+      const localExecId = `local-${Date.now()}`;
+      setSweepExecutionId(localExecId);
+    }
 
     if (!config.searchWindowStart || !config.searchWindowEnd) {
       addLog({ level: 'error', message: '[SYSTEM] Search window not configured' });
@@ -474,6 +525,20 @@ export function useClientSweep() {
         payload: { totalApiCalls, totalScanned, candidatesFound, phases: ['PROBE', 'EXPLOIT', 'FINALIZE'] },
       });
 
+      // Update search job status in DB
+      if (searchJobId) {
+        updateSearchJob(searchJobId, {
+          status: finalStatus,
+          total_scanned: totalScanned,
+          candidates_found: candidatesFound,
+          completed_at: new Date().toISOString(),
+        }).then(() => {
+          addLog({ level: 'info', message: `[JOB UPDATE] Search job ${searchJobId} marked as ${finalStatus}` });
+        }).catch(err => {
+          console.error('[JOB UPDATE] Failed to update search job:', err);
+        });
+      }
+
       return { totalApiCalls, totalScanned, candidatesFound };
     }
 
@@ -494,7 +559,7 @@ export function useClientSweep() {
       return selected;
     }
 
-  }, [ticket, config, setMetrics, addLog, addFlightResult, clearLogs, clearFlightResults, addTelemetryLog]);
+  }, [ticket, config, setMetrics, addLog, addFlightResult, clearLogs, clearFlightResults, addTelemetryLog, setSweepExecutionId, setSearchJobId]);
 
   return { runSweep, abort };
 }
