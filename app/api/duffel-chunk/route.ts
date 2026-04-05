@@ -45,12 +45,14 @@ function getCacheKey(search: ChunkSearch, origin: string, destination: string): 
 export async function POST(request: NextRequest) {
   try {
     const body: ChunkRequest = await request.json();
-    const { searches, origin, destination, cabinClass, passengerCount, baseCost, priceTolerance, originalCarrier, directFlightOnly } = body;
+    const { searches, origin, destination, cabinClass, passengerCount, originalCarrier, directFlightOnly } = body;
 
     if (!searches || !Array.isArray(searches)) {
       return NextResponse.json({ error: 'Invalid request: searches array required' }, { status: 400 });
     }
 
+    const baseCost = Number(body.baseCost);
+    const priceTolerance = Number(body.priceTolerance);
     const maxAcceptablePrice = baseCost + priceTolerance;
     
     const originalTicketData: OriginalTicketData = {
@@ -120,8 +122,8 @@ export async function POST(request: NextRequest) {
         const rejectedByBreaker: { carrier: string; departureDate: string; trueCost: number; tierPenalty: number }[] = [];
         
         for (const candidate of result.candidates) {
-          const tierPenalty = candidate.metadata?.tierPenalty || 0;
-          const trueCost = candidate.price + tierPenalty;
+          const tierPenalty = Number(candidate.metadata?.tierPenalty) || 0;
+          const trueCost = Number(candidate.price) + tierPenalty;
           
           if (trueCost <= maxAcceptablePrice) {
             filteredCandidates.push(candidate);
@@ -181,6 +183,7 @@ export async function POST(request: NextRequest) {
       results,
       maxAcceptablePrice,
       cacheStats: { hits: cacheHits, misses: cacheMisses },
+      _isCacheHit: cacheHits > 0 && cacheMisses === 0,
     });
 
   } catch (error) {

@@ -60,8 +60,8 @@ export function useClientSweep() {
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
 
-    const baseCost = ticket.baseCost || 792.87;
-    const maxAcceptablePrice = baseCost + config.priceTolerance;
+    const baseCost = Number(ticket.baseCost) || 792.87;
+    const maxAcceptablePrice = baseCost + Number(config.priceTolerance);
     let totalApiCalls = 0;
     let totalScanned = 0;
     let candidatesFound = 0;
@@ -69,7 +69,7 @@ export function useClientSweep() {
 
     clearLogs();
     clearFlightResults();
-    setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running' });
+    setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running', progress: `0 / ${config.maxApiCalls}`, apiCallsMade: 0, maxApiCalls: config.maxApiCalls });
 
     addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
     addLog({ level: 'info', message: `[SYSTEM] Budget: ${config.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
@@ -411,6 +411,7 @@ export function useClientSweep() {
         }
 
         const data = await res.json();
+        const isCacheHit = data._isCacheHit === true;
         const candidates: any[] = [];
         let scanned = 0;
         let rejected = 0;
@@ -419,6 +420,10 @@ export function useClientSweep() {
           scanned += result.rawOffersCount;
           rejected += result.rejectedCount;
           candidates.push(...result.candidates);
+        }
+
+        if (isCacheHit) {
+          addLog({ level: 'info', message: `[CACHE HIT] ${searches.length} results served from Redis cache` });
         }
 
         return {

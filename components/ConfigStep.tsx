@@ -27,9 +27,14 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
     const start = new Date(config.searchWindowStart);
     const end = new Date(config.searchWindowEnd);
     const windowDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const calculated = Math.min(1500, Math.max(15, Math.ceil((windowDays / 7) * 10)));
+    const minNights = config.minNights || 1;
+    const maxNights = config.maxNights || 14;
+    const possibleOutbounds = Math.max(1, windowDays);
+    const possibleDurations = Math.max(1, maxNights - minNights + 1);
+    const maxPermutations = possibleOutbounds * possibleDurations;
+    const calculated = Math.min(maxPermutations, Math.max(15, Math.ceil((windowDays / 7) * 10)));
     return calculated;
-  }, [config.searchWindowStart, config.searchWindowEnd]);
+  }, [config.searchWindowStart, config.searchWindowEnd, config.minNights, config.maxNights]);
 
   const getPassengerType = (index: number): 'adult' | 'child' | 'infant' => {
     return passengerTypes[index] || 'adult';
