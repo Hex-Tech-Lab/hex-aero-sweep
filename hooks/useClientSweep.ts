@@ -1,9 +1,10 @@
 import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
+import type { FlightResult } from '@/src/store/useTicketStore';
 import { createSearchJob, updateSearchJob } from '@/lib/supabase';
 import { loadFareFamilyCache, bulkInsertSearchResults, upsertPriceCalendar } from '@/lib/airline-intelligence';
-import type { FareFamilyCache } from '@/types/airline';
+import type { FareFamilyCache, FareFamilyRow } from '@/types/airline';
 
 const CHUNK_SIZE = 4;
 
@@ -153,8 +154,8 @@ export function useClientSweep() {
       addLog({ level: 'warning', message: '[CACHE] Skipping fare family cache - missing carrier, origin, or destination' });
     }
 
-    // Convert Map to Record for JSON serialization
-    const fareFamilyCacheRecord: Record<string, any> = {};
+    // Convert Map to Record for JSON serialization (strictly typed)
+    const fareFamilyCacheRecord: Record<string, FareFamilyRow> = {};
     fareFamilyCache.forEach((value, key) => {
       fareFamilyCacheRecord[key] = value;
     });
@@ -200,6 +201,9 @@ export function useClientSweep() {
 
     addLog({ level: 'info', message: `[SYSTEM] Generated ${searchNodes.length} unique search nodes` });
 
+    // SNAPSHOT: Capture results in local closure to avoid race condition with UI state changes
+    const finalizedResults: FlightResult[] = [];
+
     // Phase 1: PROBE - Strategic sampling across the timeline
     const probeCount = Math.min(24, Math.ceil(searchNodes.length * 0.15));
     const probeNodes = selectProbeNodes(searchNodes, probeCount);
@@ -233,6 +237,7 @@ export function useClientSweep() {
           message: `[PROBE MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
         } as any);
         addFlightResult(candidate);
+        finalizedResults.push(candidate);
       }
 
       updateMetrics();
@@ -331,6 +336,7 @@ export function useClientSweep() {
           message: `[EXPLOIT MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
         } as any);
         addFlightResult(candidate);
+        finalizedResults.push(candidate);
       }
 
       updateMetrics();
@@ -406,6 +412,7 @@ export function useClientSweep() {
                 message: `[SCATTER MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} (Δ$${candidate.yieldDelta.toFixed(2)})`,
               } as any);
               addFlightResult(candidate);
+              finalizedResults.push(candidate);
             }
             
             updateMetrics();
@@ -447,11 +454,13 @@ export function useClientSweep() {
         candidatesFound += result.candidates.length;
 
         for (const candidate of result.candidates) {
+          const verifiedCandidate = { ...candidate, status: 'verified' };
           addLog({
             level: 'success',
             message: `[FINALIZE MATCH] ${candidate.carrier} ${candidate.departureDate} | $${candidate.price.toFixed(2)} ✓`,
           } as any);
-          addFlightResult({ ...candidate, status: 'verified' });
+          addFlightResult(verifiedCandidate);
+          finalizedResults.push(verifiedCandidate);
         }
 
         updateMetrics();
@@ -584,8 +593,8 @@ export function useClientSweep() {
         });
       }
 
-      // Persist flight results to DB (batched)
-      const allResults = useTicketStore.getState().flightResults;
+      // Persist flight results to DB (batched) - using local snapshot to avoid race condition
+      const allResults = finalizedResults;
       if (searchJobId && allResults.length > 0) {
         try {
           const searchResultRows = allResults.map(c => ({

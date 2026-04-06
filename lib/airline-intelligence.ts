@@ -7,8 +7,9 @@ export async function loadFareFamilyCache(
   carrierIata: string,
   originIata: string,
   destIata: string,
-  year = 2026
+  year?: number
 ): Promise<FareFamilyCache> {
+  const policyYear = year ?? new Date().getFullYear();
   const cache: FareFamilyCache = new Map();
 
   const results = await Promise.all(
@@ -18,7 +19,7 @@ export async function loadFareFamilyCache(
         p_booking_class: bc,
         p_origin_iata: originIata,
         p_dest_iata: destIata,
-        p_policy_year: year,
+        p_policy_year: policyYear,
       })
     )
   );
