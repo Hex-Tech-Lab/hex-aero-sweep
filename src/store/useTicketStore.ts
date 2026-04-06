@@ -107,6 +107,13 @@ export type FlightResult = {
   metadata: Record<string, any>;
 };
 
+export type CarrierInfo = {
+  iata_code: string;
+  name: string;
+  logo_symbol_url: string | null;
+  logo_lockup_url: string | null;
+};
+
 type TicketStore = {
   ticket: TicketData;
   config: ConfigData;
@@ -116,6 +123,7 @@ type TicketStore = {
   currentStep: number;
   sweepExecutionId: string | null;
   searchJobId: string | null; // Airline schema search job ID
+  carrierCache: Map<string, CarrierInfo>;
 
   setTicket: (ticket: Partial<TicketData>) => void;
   setConfig: (config: Partial<ConfigData>) => void;
@@ -128,6 +136,7 @@ type TicketStore = {
   setSweepExecutionId: (id: string | null) => void;
   setSearchJobId: (id: string | null) => void;
   setFareFamily: (fareFamilyId: string | null, fareFamilyName: string | null, parityTier: number | null, isDomestic: boolean | undefined) => void;
+  setCarrierCache: (carriers: CarrierInfo[]) => void;
   resetStore: () => void;
   isTicketExpired: () => boolean;
   isTicketValid: () => boolean;
@@ -189,6 +198,16 @@ export const useTicketStore = create<TicketStore>()(
   currentStep: 1,
   sweepExecutionId: null,
   searchJobId: null,
+  carrierCache: new Map<string, CarrierInfo>(),
+
+  setCarrierCache: (carriers: CarrierInfo[]) =>
+    set((state) => {
+      const newCache = new Map<string, CarrierInfo>();
+      for (const c of carriers) {
+        newCache.set(c.iata_code, c);
+      }
+      return { carrierCache: newCache };
+    }),
 
   setTicket: (ticket) =>
     set((state) => {
@@ -271,6 +290,7 @@ export const useTicketStore = create<TicketStore>()(
       currentStep: 1,
       sweepExecutionId: null,
       searchJobId: null,
+      carrierCache: new Map<string, CarrierInfo>(),
     }),
 
   isTicketExpired: () => {

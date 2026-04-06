@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
-import { useTicketStore, FlightResult } from '@/src/store/useTicketStore';
+import { useTicketStore, FlightResult, CarrierInfo } from '@/src/store/useTicketStore';
+import { createClient } from '@supabase/supabase-js';
 import {
   Table,
   TableBody,
@@ -71,6 +72,7 @@ type FlightRowProps = {
   formatInboundTime: (f: any) => string;
   getStatusColor: (d: number) => string;
   getStatusBadge: (s: string) => React.ReactNode;
+  carrierInfo?: CarrierInfo | null;
 };
 
   const MemoizedFlightRow = memo(function MemoizedFlightRow({
@@ -87,6 +89,7 @@ type FlightRowProps = {
   formatInboundTime,
   getStatusColor,
   getStatusBadge,
+  carrierInfo,
 }: FlightRowProps) {
   const fb = fareBrand(flight);
   
@@ -126,7 +129,13 @@ type FlightRowProps = {
       )}
     >
       <TableCell className={cn('font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
-        <span title={CARRIER_NAMES[flight.carrier] || flight.carrier}>{flight.carrier}</span>
+        <span title={carrierInfo?.name || CARRIER_NAMES[flight.carrier] || flight.carrier}>
+          {carrierInfo?.logo_symbol_url ? (
+            <img src={carrierInfo.logo_symbol_url} alt={flight.carrier} className="w-6 h-6 object-contain" />
+          ) : (
+            flight.carrier
+          )}
+        </span>
       </TableCell>
       <TableCell className={cn('font-mono text-[10px] px-1', isOutOfRange ? 'text-slate-600' : 'text-slate-300')}>
         {formatOutboundDate(flight)}
@@ -200,7 +209,7 @@ type FlightRowProps = {
 type PresetFilter = 'All' | 'Top Matches' | 'Cheapest' | 'Shortest';
 
 export function FlightDataTable() {
-  const { flightResults, ticket } = useTicketStore();
+  const { flightResults, ticket, carrierCache, setCarrierCache } = useTicketStore();
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -208,6 +217,22 @@ export function FlightDataTable() {
   const [inputValue, setInputValue] = useState('');
   const [activePreset, setActivePreset] = useState<PresetFilter>('All');
   const pageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (carrierCache.size > 0) return;
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || ''
+    );
+    (async () => {
+      try {
+        const { data } = await supabase.schema('airline').from('carriers').select('iata_code, name, logo_symbol_url, logo_lockup_url');
+        if (data) setCarrierCache(data as CarrierInfo[]);
+      } catch (e) {
+        console.error('Failed to load carrier cache:', e);
+      }
+    })();
+  }, [carrierCache.size, setCarrierCache]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -447,7 +472,7 @@ export function FlightDataTable() {
 
   const verifiedCount = flightResults.filter(f => f.status === 'verified').length;
   const fareBrand = useCallback((flight: any) => flight.metadata?.fareBrand || flight.fareBrand || 'Standard', []);
-  const carrierName = useCallback((code: string) => CARRIER_NAMES[code] || code, []);
+  const carrierName = useCallback((code: string) => carrierCache.get(code)?.name || CARRIER_NAMES[code] || code, [carrierCache]);
 
   const selectedFlight = useMemo(() => {
     return flightResults.find(f => f.id === activeCandidateId) || null;
@@ -553,6 +578,7 @@ export function FlightDataTable() {
                 const isOutOfRange = flight.status === 'out_of_range';
                 const isActive = activeCandidateId === flight.id;
                 const isTopMatch = topMatchIds.has(flight.id);
+                const ci = carrierCache.get(flight.carrier);
                 return (
                   <MemoizedFlightRow
                     key={flight.id}
@@ -569,6 +595,7 @@ export function FlightDataTable() {
                     formatInboundTime={formatInboundTime}
                     getStatusColor={getStatusColor}
                     getStatusBadge={getStatusBadge}
+                    carrierInfo={ci}
                   />
                 );
               })
@@ -634,9 +661,17 @@ export function FlightDataTable() {
           {selectedFlight && (
             <div className="p-4 space-y-4 overflow-x-hidden">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                <div className="p-2 bg-cyan-500/20 rounded shrink-0">
-                  <Plane className="w-6 h-6 text-cyan-400" />
-                </div>
+                {carrierCache.get(selectedFlight.carrier)?.logo_lockup_url ? (
+                  <img
+                    src={carrierCache.get(selectedFlight.carrier)!.logo_lockup_url!}
+                    alt={selectedFlight.carrier}
+                    className="h-8 object-contain shrink-0"
+                  />
+                ) : (
+                  <div className="p-2 bg-cyan-500/20 rounded shrink-0">
+                    <Plane className="w-6 h-6 text-cyan-400" />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <h2 className="text-2xl font-bold text-slate-100 truncate">
                     {carrierName(selectedFlight.carrier)}
