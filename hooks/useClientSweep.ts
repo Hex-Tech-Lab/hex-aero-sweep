@@ -1,7 +1,9 @@
 import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
-import { createSearchJob, updateSearchJob, insertSweepExecution } from '@/lib/supabase';
+import { createSearchJob, updateSearchJob } from '@/lib/supabase';
+import { loadFareFamilyCache, bulkInsertSearchResults, upsertPriceCalendar } from '@/lib/airline-intelligence';
+import type { FareFamilyCache } from '@/types/airline';
 
 const CHUNK_SIZE = 4;
 
@@ -63,8 +65,16 @@ export function useClientSweep() {
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
 
-    const baseCost = Number(ticket.baseCost) || 792.87;
-    const maxAcceptablePrice = baseCost + Number(config.priceTolerance);
+    // SNAPSHOT: Read all required state ONCE before the sweep loop
+    // This prevents race conditions if user modifies inputs during sweep
+    const snapshot = useTicketStore.getState();
+    const {
+      ticket: snapTicket,
+      config: snapConfig,
+    } = snapshot;
+
+    const baseCost = Number(snapTicket.baseCost) || 792.87;
+    const maxAcceptablePrice = baseCost + Number(snapConfig.priceTolerance);
     let totalApiCalls = 0;
     let totalScanned = 0;
     let candidatesFound = 0;
@@ -72,10 +82,10 @@ export function useClientSweep() {
 
     clearLogs();
     clearFlightResults();
-    setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running', progress: `0 / ${config.maxApiCalls}`, apiCallsMade: 0, maxApiCalls: config.maxApiCalls });
+    setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running', progress: `0 / ${snapConfig.maxApiCalls}`, apiCallsMade: 0, maxApiCalls: snapConfig.maxApiCalls });
 
     addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
-    addLog({ level: 'info', message: `[SYSTEM] Budget: ${config.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
+    addLog({ level: 'info', message: `[SYSTEM] Budget: ${snapConfig.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
 
     // Phase 0: Initialize Search Job in Airline Intelligence Schema
     let searchJobId: string | null = null;
@@ -84,23 +94,23 @@ export function useClientSweep() {
     try {
       addLog({ level: 'info', message: '[JOB INIT] Creating search job in Airline Intelligence Schema...' });
 
-      const searchWindowStart = config.searchWindowStart ? new Date(config.searchWindowStart).toISOString().split('T')[0] : '';
-      const searchWindowEnd = config.searchWindowEnd ? new Date(config.searchWindowEnd).toISOString().split('T')[0] : '';
+      const searchWindowStart = snapConfig.searchWindowStart ? new Date(snapConfig.searchWindowStart).toISOString().split('T')[0] : '';
+      const searchWindowEnd = snapConfig.searchWindowEnd ? new Date(snapConfig.searchWindowEnd).toISOString().split('T')[0] : '';
 
       const jobResult = await createSearchJob({
-        p_ticket_id: ticket.dbTicketId || '',
-        p_pnr: ticket.pnr,
-        p_carrier_iata: ticket.carrier || 'A3',
-        p_booking_class: ticket.bookingClass || 'Y',
-        p_fare_family_id: ticket.fareFamilyId || null,
-        p_parity_tier: ticket.parityTier || null,
+        p_ticket_id: snapTicket.dbTicketId || '',
+        p_pnr: snapTicket.pnr,
+        p_carrier_iata: snapTicket.carrier || 'A3',
+        p_booking_class: snapTicket.bookingClass || 'Y',
+        p_fare_family_id: snapTicket.fareFamilyId || null,
+        p_parity_tier: snapTicket.parityTier || null,
         p_anchor_base_cost: baseCost,
         p_search_window_start: searchWindowStart,
         p_search_window_end: searchWindowEnd,
-        p_min_nights: config.minNights,
-        p_max_nights: config.maxNights,
-        p_price_tolerance: Number(config.priceTolerance),
-        p_max_api_calls: config.maxApiCalls,
+        p_min_nights: snapConfig.minNights,
+        p_max_nights: snapConfig.maxNights,
+        p_price_tolerance: Number(snapConfig.priceTolerance),
+        p_max_api_calls: snapConfig.maxApiCalls,
       });
 
       if (jobResult) {
@@ -110,10 +120,9 @@ export function useClientSweep() {
         setSweepExecutionId(sweepExecutionId);
         addLog({ level: 'success', message: `[JOB INIT] ✓ Search Job created: ${searchJobId}` });
         addLog({ level: 'info', message: `[JOB INIT] Sweep Execution ID: ${sweepExecutionId}` });
-        addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${ticket.parityTier || 'default'} | Fare Family: ${ticket.fareFamilyName || 'unknown'}` });
+        addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${snapTicket.parityTier || 'default'} | Fare Family: ${snapTicket.fareFamilyName || 'unknown'}` });
       } else {
         addLog({ level: 'warning', message: '[JOB INIT] Failed to create search job in DB - continuing in local mode' });
-        // Fallback: create local sweep execution ID
         const localExecId = `local-${Date.now()}`;
         setSweepExecutionId(localExecId);
         addLog({ level: 'info', message: `[JOB INIT] Using local execution ID: ${localExecId}` });
@@ -125,22 +134,47 @@ export function useClientSweep() {
       setSweepExecutionId(localExecId);
     }
 
-    if (!config.searchWindowStart || !config.searchWindowEnd) {
+    // Phase 0b: Load Fare Family Cache ONCE (12 parallel RPCs, not N per candidate)
+    let fareFamilyCache: FareFamilyCache = new Map();
+    if (snapTicket.carrier && snapTicket.origin && snapTicket.destination) {
+      try {
+        addLog({ level: 'info', message: `[CACHE] Loading fare family cache for ${snapTicket.carrier} ${snapTicket.origin}-${snapTicket.destination}...` });
+        fareFamilyCache = await loadFareFamilyCache(
+          snapTicket.carrier,
+          snapTicket.origin,
+          snapTicket.destination
+        );
+        addLog({ level: 'success', message: `[CACHE] ✓ Loaded ${fareFamilyCache.size} fare families` });
+      } catch (cacheError) {
+        console.error('[CACHE] Failed to load fare family cache:', cacheError);
+        addLog({ level: 'warning', message: '[CACHE] Fare family cache unavailable - using default penalties' });
+      }
+    } else {
+      addLog({ level: 'warning', message: '[CACHE] Skipping fare family cache - missing carrier, origin, or destination' });
+    }
+
+    // Convert Map to Record for JSON serialization
+    const fareFamilyCacheRecord: Record<string, any> = {};
+    fareFamilyCache.forEach((value, key) => {
+      fareFamilyCacheRecord[key] = value;
+    });
+
+    if (!snapConfig.searchWindowStart || !snapConfig.searchWindowEnd) {
       addLog({ level: 'error', message: '[SYSTEM] Search window not configured' });
       return { totalApiCalls: 0, totalScanned: 0, candidatesFound: 0 };
     }
 
-    const startDate = new Date(config.searchWindowStart);
-    const endDate = new Date(config.searchWindowEnd);
+    const startDate = new Date(snapConfig.searchWindowStart);
+    const endDate = new Date(snapConfig.searchWindowEnd);
     const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Build search space
     const searchNodes: SearchNode[] = [];
     const searchSignatures = new Set<string>();
 
-    for (let d = 0; d <= totalDays && searchNodes.length < config.maxApiCalls; d++) {
+    for (let d = 0; d <= totalDays && searchNodes.length < snapConfig.maxApiCalls; d++) {
       const depDate = addDays(startDate, d);
-      for (let nights = config.minNights; nights <= config.maxNights && searchNodes.length < config.maxApiCalls; nights++) {
+      for (let nights = snapConfig.minNights; nights <= snapConfig.maxNights && searchNodes.length < snapConfig.maxApiCalls; nights++) {
         const retDate = addDays(depDate, nights);
         if (retDate <= endDate) {
           const depStr = depDate.toISOString().split('T')[0];
@@ -175,7 +209,7 @@ export function useClientSweep() {
     const probeChunks = chunkArray(probeNodes, CHUNK_SIZE);
     for (let i = 0; i < probeChunks.length && !signal.aborted; i++) {
       const chunk = probeChunks[i];
-      const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+      const result = await processChunk(chunk, baseCost, maxAcceptablePrice, snapTicket, snapConfig, fareFamilyCacheRecord, snapTicket.fareFamilyId, snapTicket.parityTier, snapTicket.passengerAdults, snapTicket.passengerChildren, searchJobId);
 
       if (signal.aborted) break;
 
@@ -273,7 +307,7 @@ export function useClientSweep() {
       const batchSize = Math.min(CHUNK_SIZE, rankedNodes.length, exploitationBudget - exploitCalls);
       const batch = rankedNodes.slice(0, batchSize).map(r => r.node);
 
-      const result = await processChunk(batch, baseCost, maxAcceptablePrice, ticket, config);
+      const result = await processChunk(batch, baseCost, maxAcceptablePrice, snapTicket, snapConfig, fareFamilyCacheRecord, snapTicket.fareFamilyId, snapTicket.parityTier, snapTicket.passengerAdults, snapTicket.passengerChildren, searchJobId);
 
       if (signal.aborted) break;
 
@@ -349,7 +383,7 @@ export function useClientSweep() {
           const scatterChunks = chunkArray(scatterBatch, CHUNK_SIZE);
           for (let i = 0; i < scatterChunks.length && !signal.aborted; i++) {
             const chunk = scatterChunks[i];
-            const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+            const result = await processChunk(chunk, baseCost, maxAcceptablePrice, snapTicket, snapConfig, fareFamilyCacheRecord, snapTicket.fareFamilyId, snapTicket.parityTier, snapTicket.passengerAdults, snapTicket.passengerChildren, searchJobId);
             
             if (signal.aborted) break;
             
@@ -403,7 +437,7 @@ export function useClientSweep() {
       const finalizeChunks = chunkArray(topNodes, CHUNK_SIZE);
       for (let i = 0; i < finalizeChunks.length && !signal.aborted; i++) {
         const chunk = finalizeChunks[i];
-        const result = await processChunk(chunk, baseCost, maxAcceptablePrice, ticket, config);
+        const result = await processChunk(chunk, baseCost, maxAcceptablePrice, snapTicket, snapConfig, fareFamilyCacheRecord, snapTicket.fareFamilyId, snapTicket.parityTier, snapTicket.passengerAdults, snapTicket.passengerChildren, searchJobId);
 
         if (signal.aborted) break;
 
@@ -432,7 +466,13 @@ export function useClientSweep() {
       baseCost: number,
       maxPrice: number,
       ticket: any,
-      config: any
+      config: any,
+      fareFamilyCache: Record<string, any>,
+      anchorFamilyId: string | null | undefined,
+      anchorTier: number | null | undefined,
+      passengerAdults: number | undefined,
+      passengerChildren: number | undefined,
+      jobId: string | null
     ): Promise<{ apiCalls: number; scanned: number; rejected: number; candidates: any[] }> {
       if (signal.aborted) {
         return { apiCalls: 0, scanned: 0, rejected: 0, candidates: [] };
@@ -446,14 +486,19 @@ export function useClientSweep() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             searches,
-            origin: 'CAI',
-            destination: 'ATH',
+            origin: ticket.origin || 'CAI',
+            destination: ticket.destination || 'ATH',
             cabinClass: 'economy',
             passengerCount: ticket.passengers.length,
             baseCost,
             priceTolerance: config.priceTolerance,
-            originalCarrier: 'A3',
+            originalCarrier: ticket.carrier || 'A3',
             directFlightOnly: config.directFlightOnly,
+            fareFamilyCache,
+            anchorFamilyId,
+            anchorTier,
+            passengerAdults,
+            passengerChildren,
           }),
         });
 
@@ -495,22 +540,22 @@ export function useClientSweep() {
         candidatesFound,
         outOfRange,
         status: 'running',
-        progress: `${totalApiCalls}/${config.maxApiCalls}`,
+        progress: `${totalApiCalls}/${snapConfig.maxApiCalls}`,
         apiCallsMade: totalApiCalls,
-        maxApiCalls: config.maxApiCalls,
+        maxApiCalls: snapConfig.maxApiCalls,
       });
     }
 
-    function finalize() {
+    async function finalize() {
       const finalStatus = signal.aborted ? 'aborted' : 'completed';
       setMetrics({
         totalScanned,
         candidatesFound,
         outOfRange,
         status: finalStatus,
-        progress: `${totalApiCalls}/${config.maxApiCalls}`,
+        progress: `${totalApiCalls}/${snapConfig.maxApiCalls}`,
         apiCallsMade: totalApiCalls,
-        maxApiCalls: config.maxApiCalls,
+        maxApiCalls: snapConfig.maxApiCalls,
       });
 
       addLog({
@@ -537,6 +582,69 @@ export function useClientSweep() {
         }).catch(err => {
           console.error('[JOB UPDATE] Failed to update search job:', err);
         });
+      }
+
+      // Persist flight results to DB (batched)
+      const allResults = useTicketStore.getState().flightResults;
+      if (searchJobId && allResults.length > 0) {
+        try {
+          const searchResultRows = allResults.map(c => ({
+            job_id: searchJobId,
+            outbound_flight: c.outboundSegments?.[0]?.flightNumber || '',
+            inbound_flight: c.inboundSegments?.[0]?.flightNumber || '',
+            outbound_dep: c.departureDate || '',
+            inbound_dep: c.returnDate || '',
+            nights: c.nights,
+            carrier_iata: c.carrier,
+            booking_class_out: c.bookingClass || 'Y',
+            fare_family_name: c.resolvedFamilyName || 'Unknown',
+            base_fare_eur: c.price,
+            taxes_eur: 0,
+            total_raw_eur: c.price,
+            parity_total_penalty: c.metadata?.tierPenalty || 0,
+            total_normalized_eur: c.price + (c.metadata?.tierPenalty || 0),
+            net_saving_eur: baseCost - (c.price + (c.metadata?.tierPenalty || 0)),
+            is_saving: (baseCost - (c.price + (c.metadata?.tierPenalty || 0))) > 0,
+            status: c.status,
+            penalty_badge: c.penaltyBadge || null,
+            raw_offer: null,
+          }));
+
+          await bulkInsertSearchResults(searchResultRows);
+          addLog({ level: 'success', message: `[DB] Persisted ${searchResultRows.length} results to search_results` });
+
+          // UPSERT price_calendar with cheapest normalized cost per (date, nights)
+          const calendarMap = new Map<string, typeof allResults[0]>();
+          for (const c of allResults) {
+            const key = `${c.departureDate}-${c.nights}`;
+            const existing = calendarMap.get(key);
+            const normalizedCost = c.price + (c.metadata?.tierPenalty || 0);
+            const existingCost = existing
+              ? existing.price + (existing.metadata?.tierPenalty || 0)
+              : Infinity;
+            if (normalizedCost < existingCost) {
+              calendarMap.set(key, c);
+            }
+          }
+
+          const calendarRows = Array.from(calendarMap.values()).map(c => ({
+            job_id: searchJobId,
+            outbound_date: c.departureDate,
+            nights: c.nights,
+            cheapest_raw: c.price,
+            cheapest_normalized: c.price + (c.metadata?.tierPenalty || 0),
+            fare_family: c.resolvedFamilyName || 'Unknown',
+            booking_class: c.bookingClass || 'Y',
+            data_source: 'DUFFEL' as const,
+            confidence: null,
+          }));
+
+          await upsertPriceCalendar(calendarRows);
+          addLog({ level: 'success', message: `[DB] UPSERTed ${calendarRows.length} entries to price_calendar` });
+        } catch (dbError) {
+          console.error('[DB] Failed to persist results:', dbError);
+          addLog({ level: 'warning', message: `[DB] Failed to persist results to DB - see logs` });
+        }
       }
 
       return { totalApiCalls, totalScanned, candidatesFound };

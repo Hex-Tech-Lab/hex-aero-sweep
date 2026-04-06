@@ -20,6 +20,11 @@ interface ChunkRequest {
   priceTolerance: number;
   originalCarrier: string;
   directFlightOnly?: boolean;
+  fareFamilyCache?: Record<string, any>;
+  anchorFamilyId?: string | null;
+  anchorTier?: number | null;
+  passengerAdults?: number;
+  passengerChildren?: number;
 }
 
 let redis: Redis | null = null;
@@ -102,6 +107,11 @@ export async function POST(request: NextRequest) {
       // Cache miss - fetch from Duffel
       cacheMisses++;
       try {
+        // Convert fareFamilyCache Record to Map if provided
+        const fareFamilyCacheMap = body.fareFamilyCache
+          ? new Map(Object.entries(body.fareFamilyCache))
+          : undefined;
+
         const result = await searchDuffelOffers({
           origin,
           destination,
@@ -116,6 +126,11 @@ export async function POST(request: NextRequest) {
             outboundTimePreference: 'any',
             inboundTimePreference: 'any',
           },
+          fareFamilyCache: fareFamilyCacheMap,
+          anchorFamilyId: body.anchorFamilyId,
+          anchorTier: body.anchorTier,
+          passengerAdults: body.passengerAdults,
+          passengerChildren: body.passengerChildren,
         });
 
         const filteredCandidates: FlightCandidate[] = [];
