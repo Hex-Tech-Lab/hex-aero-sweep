@@ -151,34 +151,8 @@ async function upsertCarriers(
         });
       
       if (error) {
-        // If schema() method fails, fall back to raw SQL via RPC
-        console.warn(`  ⚠️  Schema method failed, trying RPC fallback: ${error.message}`);
-        
-        const values = batch.map((c, idx) => {
-          const offset = idx * 7;
-          return `($${offset + 1}::varchar, $${offset + 2}::varchar, $${offset + 3}::varchar, $${offset + 4}::varchar, $${offset + 5}::varchar, $${offset + 6}::varchar, $${offset + 7}::timestamptz)`;
-        }).join(', ');
-        
-        const params: any[] = [];
-        batch.forEach(c => {
-      params.push(
-        c.iata_code,
-        c.name,
-        c.logo_lockup_url,
-        c.logo_symbol_url,
-        c.conditions_url,
-        c.duffel_id,
-        c.updated_at
-      );
-        });
-        
-        const rpcResult = await supabase.rpc('execute_sql', {
-          query: `INSERT INTO airline.carriers (iata_code, name, logo_lockup_url, logo_symbol_url, conditions_url, duffel_id, updated_at) VALUES ${values} ON CONFLICT (iata_code) DO UPDATE SET name = EXCLUDED.name, logo_lockup_url = EXCLUDED.logo_lockup_url, logo_symbol_url = EXCLUDED.logo_symbol_url, conditions_url = EXCLUDED.conditions_url, duffel_id = EXCLUDED.duffel_id, updated_at = EXCLUDED.updated_at`,
-        });
-        
-        if (rpcResult.error) {
-          throw new Error(rpcResult.error.message);
-        }
+        console.error(`  ❌ Batch ${batchNum} failed: ${error.message}`);
+        throw error;
       }
       
       // Count results
