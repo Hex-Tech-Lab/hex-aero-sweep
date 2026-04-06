@@ -456,10 +456,28 @@ export async function searchDuffelOffers(params: {
         resolvedFamilyId = candidateFamily.fare_family_id ?? null;
         resolvedFamilyName = candidateFamily.fare_family_name ?? null;
 
+        console.log(`[duffel-service] Fare family lookup for ${offerBookingClass}:`, {
+          candidateTier,
+          anchorTier,
+          resolvedFamilyId,
+          resolvedFamilyName,
+          anchorFamilyId: params.anchorFamilyId,
+          hasAnchorFamilyId: !!params.anchorFamilyId,
+          hasResolvedFamilyId: !!resolvedFamilyId,
+          tierCheck: candidateTier !== null && anchorTier !== null && candidateTier < anchorTier,
+        });
+
         // Only compute penalty if candidate tier is lower than anchor and both tiers are resolved
         if (candidateTier !== null && anchorTier !== null && candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
           const adults = params.passengerAdults ?? 1;
           const children = params.passengerChildren ?? 0;
+
+          console.log('[duffel-service] Calling compute_parity_penalty RPC with:', {
+            p_original_family_id: params.anchorFamilyId,
+            p_candidate_family_id: resolvedFamilyId,
+            p_passenger_adults: adults,
+            p_passenger_children: children,
+          });
 
           const { data: penalty, error: penaltyError } = await supabase.rpc('compute_parity_penalty', {
             p_original_family_id: params.anchorFamilyId,
@@ -469,14 +487,28 @@ export async function searchDuffelOffers(params: {
           });
 
           if (penaltyError) {
-            console.warn(`[Duffel] compute_parity_penalty RPC failed: ${penaltyError.message}. Defaulting to 0.`);
+            console.error('[duffel-service] RPC call FAILED:', {
+              code: penaltyError.code,
+              message: penaltyError.message,
+              details: penaltyError.details,
+            });
+            console.warn('[duffel-service] Falling back to 0 penalty. This means parity penalty is NOT being computed.');
             tierPenalty = 0;
           } else {
             tierPenalty = (penalty as number) ?? 0;
+            console.log('[duffel-service] RPC call succeeded, penalty:', tierPenalty);
           }
+        } else {
+          console.log('[duffel-service] Skipping RPC - tier check not met:', {
+            candidateTier,
+            anchorTier,
+            candidateTierIsLower: candidateTier !== null && anchorTier !== null && candidateTier < anchorTier,
+            hasAnchorFamilyId: !!params.anchorFamilyId,
+            hasResolvedFamilyId: !!resolvedFamilyId,
+          });
         }
       } else {
-        console.warn(`[Duffel] No fare family found for booking class ${offerBookingClass}. Candidate tier unresolved.`);
+        console.warn(`[duffel-service] No fare family found for booking class ${offerBookingClass}. Candidate tier unresolved.`);
       }
 
       yieldDelta += tierPenalty;

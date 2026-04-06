@@ -226,7 +226,7 @@ export function FlightDataTable() {
     if (carrierCache.size > 0) return;
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || ''
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
     (async () => {
       try {

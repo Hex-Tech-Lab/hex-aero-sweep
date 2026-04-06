@@ -115,26 +115,88 @@ export function useClientSweep() {
       const searchWindowStart = snapConfig.searchWindowStart ? new Date(snapConfig.searchWindowStart).toISOString().split('T')[0] : '';
       const searchWindowEnd = snapConfig.searchWindowEnd ? new Date(snapConfig.searchWindowEnd).toISOString().split('T')[0] : '';
 
+      // DIAGNOSTIC: Log Zustand store state BEFORE payload creation
+      console.log('[useClientSweep] Store snapshot BEFORE payload creation:', {
+        carrier: snapTicket.carrier,
+        origin: snapTicket.origin,
+        destination: snapTicket.destination,
+        bookingClass: snapTicket.bookingClass,
+        fareFamilyId: snapTicket.fareFamilyId,
+        parityTier: snapTicket.parityTier,
+        anchorTier: snapTicket.parityTier,
+        dbTicketId: snapTicket.dbTicketId,
+        pnr: snapTicket.pnr,
+        passengers: snapTicket.passengers,
+        passengerAdults: snapTicket.passengerAdults,
+        passengerChildren: snapTicket.passengerChildren,
+      });
+
+      const payload = {
+        ticketId: snapTicket.dbTicketId || '',
+        pnr: snapTicket.pnr || '',
+        carrierIata: snapTicket.carrier,
+        bookingClass: snapTicket.bookingClass || 'Y',
+        originIata: snapTicket.origin,
+        destIata: snapTicket.destination,
+        fareFamilyId: snapTicket.fareFamilyId || null,
+        parityTier: snapTicket.parityTier ?? null,
+        anchorBaseCost: baseCost,
+        searchWindowStart,
+        searchWindowEnd,
+        minNights: snapConfig.minNights,
+        maxNights: snapConfig.maxNights,
+        priceTolerance: Number(snapConfig.priceTolerance),
+        maxApiCalls: snapConfig.maxApiCalls,
+      };
+
+      // DIAGNOSTIC: Validate required fields BEFORE fetch
+      if (!payload.originIata || !payload.destIata || !payload.carrierIata) {
+        console.error('[useClientSweep] FATAL: Missing required fields in payload', {
+          originIata: payload.originIata || 'MISSING',
+          destIata: payload.destIata || 'MISSING',
+          carrierIata: payload.carrierIata || 'MISSING',
+        });
+        addLog({ level: 'error', message: '[JOB INIT] FATAL: Missing required payload fields (origin, destination, or carrier)' });
+        throw new SweepInitializationError('Missing required payload fields');
+      }
+
+      // DIAGNOSTIC: Log exact payload being sent
+      console.log('[useClientSweep] POST /api/init-job payload:', {
+        ticketId: payload.ticketId,
+        pnr: payload.pnr,
+        originIata: payload.originIata,
+        destIata: payload.destIata,
+        carrierIata: payload.carrierIata,
+        bookingClass: payload.bookingClass,
+        fareFamilyId: payload.fareFamilyId,
+        parityTier: payload.parityTier,
+        anchorBaseCost: payload.anchorBaseCost,
+        searchWindowStart: payload.searchWindowStart,
+        searchWindowEnd: payload.searchWindowEnd,
+        minNights: payload.minNights,
+        maxNights: payload.maxNights,
+        priceTolerance: payload.priceTolerance,
+        maxApiCalls: payload.maxApiCalls,
+      });
+
       const response = await fetch('/api/init-job', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketId: snapTicket.dbTicketId || '',
-          pnr: snapTicket.pnr || '',
-          carrierIata: snapTicket.carrier,
-          bookingClass: snapTicket.bookingClass || 'Y',
-          originIata: snapTicket.origin,
-          destIata: snapTicket.destination,
-          fareFamilyId: snapTicket.fareFamilyId || null,
-          parityTier: snapTicket.parityTier ?? null,
-          anchorBaseCost: baseCost,
-          searchWindowStart,
-          searchWindowEnd,
-          minNights: snapConfig.minNights,
-          maxNights: snapConfig.maxNights,
-          priceTolerance: Number(snapConfig.priceTolerance),
-          maxApiCalls: snapConfig.maxApiCalls,
-        }),
+        body: JSON.stringify(payload),
+      });
+
+      // DIAGNOSTIC: Log response status and body
+      const json = await response.json().catch(() => ({}));
+
+      console.log('[useClientSweep] /api/init-job response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: json,
+        success: json.success || false,
+        jobId: json.jobId || null,
+        sweepExecutionId: json.sweepExecutionId || null,
+        error: json.error || null,
+        details: json.details || null,
       });
 
       if (response.ok) {

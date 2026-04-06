@@ -156,30 +156,114 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
       return;
     }
 
+    setIsParsing(true);
+    simulateProcessing();
+
+    const startTime = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    addLog({
+      source: 'DUFFEL',
+      type: 'REQUEST',
+      message: `PNR Truth Engine: Fetching order ${ticket.pnr}`,
+      payload: { pnr: ticket.pnr, lastName: ticket.primaryPassengerLastName }
+    });
+
     try {
+      const response = await fetch('/api/ingest-pnr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pnr: ticket.pnr,
+          lastName: ticket.primaryPassengerLastName,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const result = await response.json();
+      const latency = Date.now() - startTime;
+
+      if (!response.ok) {
+        addLog({
+          source: 'DUFFEL',
+          type: 'ERROR',
+          message: result.error || 'PNR lookup failed',
+          payload: result,
+          latency,
+        });
+
+        throw new Error(result.error || 'Failed to fetch order from Duffel');
+      }
+
+      addLog({
+        source: 'DUFFEL',
+        type: 'RESPONSE',
+        message: `PNR Truth Engine: Order fetched successfully`,
+        payload: result,
+        latency,
+      });
+
+      const ticketData = result.ticket;
+
       const mockIssueDate = new Date();
       mockIssueDate.setDate(mockIssueDate.getDate() - 30);
       const mockExpirationDate = new Date(mockIssueDate);
       mockExpirationDate.setFullYear(mockExpirationDate.getFullYear() + 1);
 
       setTicket({
-        passengers: ['Primary Passenger'],
-        fareClass: 'ECONOMY',
-        baseCost: 142.50,
+        pnr: ticketData.pnr,
+        primaryPassengerLastName: ticket.primaryPassengerLastName,
+        passengers: [`${ticketData.rawOrderData?.passengers?.[0]?.given_name || 'PASSENGER'} ${ticketData.rawOrderData?.passengers?.[0]?.family_name || ''}`],
+        carrier: ticketData.carrier,
+        origin: ticketData.origin,
+        destination: ticketData.destination,
+        bookingClass: ticketData.bookingClass,
+        fareClass: ticketData.rawOrderData?.cabinClass?.toUpperCase() || 'ECONOMY',
+        baseCost: parseFloat(ticketData.rawOrderData?.totalAmount) || 0,
         issueDate: mockIssueDate,
         expirationDate: mockExpirationDate,
+        departureDate: ticketData.departureDate ? new Date(ticketData.departureDate) : null,
+        passengerBreakdown: {
+          adults: ticketData.passengers?.adults || 1,
+          children: ticketData.passengers?.children || 0,
+          infants: ticketData.passengers?.infants || 0,
+          passengerTypeSource: 'DUFFEL_ORDER_API',
+        },
         rules: {
           validity: '12 months from issue',
-          luggage: '1 x 23kg checked bag, 1 x 7kg carry-on',
-          cancellation: 'Non-refundable, change fee applies',
+          luggage: 'Check carrier policy',
+          cancellation: ticketData.rawOrderData?.fareBrand || 'Subject to fare rules',
         },
       });
 
-      simulateProcessing();
-      toast.success('GDS record synced successfully');
+      setIsParsing(false);
+      setProcessingState('authenticated');
+      toast.success('PNR Truth Engine: Order authenticated via Duffel API');
+      onNext();
     } catch (error) {
+      clearTimeout(timeoutId);
       setProcessingState('idle');
-      toast.error('Failed to sync GDS record');
+      setIsParsing(false);
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        addLog({
+          source: 'DUFFEL',
+          type: 'ERROR',
+          message: 'Request Timed Out after 30s',
+          payload: { timeout: 30000 }
+        });
+        toast.error('Request timed out - Duffel API may be unresponsive');
+      } else {
+        const errorMsg = error instanceof Error ? error.message : 'Failed to sync GDS record';
+        addLog({
+          source: 'DUFFEL',
+          type: 'ERROR',
+          message: errorMsg,
+        });
+        toast.error(errorMsg);
+      }
     }
   };
 
