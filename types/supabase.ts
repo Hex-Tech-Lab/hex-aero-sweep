@@ -113,12 +113,12 @@ export interface ResolveFareFamilyResult {
 }
 
 export interface CreateSearchJobParams {
-  p_ticket_id: string;
-  p_pnr: string;
+  p_ticket_id?: string | null;
+  p_pnr?: string | null;
   p_carrier_iata: string;
   p_booking_class: string;
-  p_fare_family_id: string | null;
-  p_parity_tier: number | null;
+  p_fare_family_id?: string | null;
+  p_parity_tier?: number | null;
   p_anchor_base_cost: number;
   p_search_window_start: string;
   p_search_window_end: string;
@@ -126,6 +126,8 @@ export interface CreateSearchJobParams {
   p_max_nights: number;
   p_price_tolerance: number;
   p_max_api_calls: number;
+  p_origin_iata?: string;
+  p_dest_iata?: string;
 }
 
 export interface CreateSearchJobResult {

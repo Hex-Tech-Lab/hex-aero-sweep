@@ -27,6 +27,11 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
   const [hasStarted, setHasStarted] = useState(false);
   const [isClientRunning, setIsClientRunning] = useState(false);
 
+  const { searchJobId } = useTicketStore();
+  const isLocalMode = searchJobId?.startsWith('local-') ?? false;
+  const isAwaitingSync = searchJobId === null || searchJobId === '';
+  const isSynced = searchJobId && !isLocalMode;
+
   const handleLogoClick = () => {
     resetStore();
     router.push('/');
@@ -90,12 +95,19 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
   }, [abort, setMetrics]);
 
   const getStatusBadgeVariant = () => {
-    switch (metrics.status) {
-      case 'running': return 'default';
-      case 'completed': return 'secondary';
-      case 'error': return 'destructive';
-      default: return 'outline';
-    }
+    if (metrics.status === 'running') return 'default';
+    if (metrics.status === 'completed' || metrics.status === 'aborted') return 'secondary';
+    if (metrics.status === 'error') return 'destructive';
+    if (isSynced) return 'secondary';
+    if (isLocalMode) return 'destructive';
+    return 'outline';
+  };
+
+  const getStatusBadgeText = () => {
+    if (isAwaitingSync) return 'DB SYNC: AWAITING';
+    if (isLocalMode) return 'DB SYNC: OFFLINE';
+    if (isSynced) return 'DB SYNC: STABLE';
+    return metrics.status === 'idle' ? 'DB SYNC: IDLE' : `STATUS: ${metrics.status}`;
   };
 
   const isRunning = metrics.status === 'running' || isClientRunning;
@@ -142,7 +154,7 @@ export function GlobalHeader({ currentStep, onBack }: GlobalHeaderProps) {
               <div className="flex items-center gap-2">
                 <Badge variant={getStatusBadgeVariant()} className="uppercase text-[10px]">
                   <Database className="w-3 h-3 mr-1" />
-                  {metrics.status === 'idle' ? 'DB SYNC: STABLE' : `STATUS: ${metrics.status}`}
+                  {getStatusBadgeText()}
                 </Badge>
                 {isRunning && (
                   <motion.div

@@ -10,6 +10,8 @@ interface InitJobRequest {
   pnr: string;
   carrierIata: string;
   bookingClass: string;
+  originIata: string;
+  destIata: string;
   fareFamilyId: string | null;
   parityTier: number | null;
   anchorBaseCost: number;
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     const body: InitJobRequest = await request.json();
 
     const requiredFields: (keyof InitJobRequest)[] = [
-      'ticketId', 'carrierIata', 'bookingClass', 'anchorBaseCost',
+      'carrierIata', 'bookingClass', 'anchorBaseCost',
       'searchWindowStart', 'searchWindowEnd', 'minNights', 'maxNights'
     ];
 
@@ -71,12 +73,12 @@ export async function POST(request: NextRequest) {
     }
 
     const params: CreateSearchJobParams = {
-      p_ticket_id: body.ticketId,
-      p_pnr: body.pnr,
+      p_ticket_id: body.ticketId || null,
+      p_pnr: body.pnr || null,
       p_carrier_iata: body.carrierIata,
       p_booking_class: body.bookingClass,
-      p_fare_family_id: body.fareFamilyId,
-      p_parity_tier: body.parityTier,
+      p_fare_family_id: body.fareFamilyId || null,
+      p_parity_tier: body.parityTier ?? null,
       p_anchor_base_cost: body.anchorBaseCost,
       p_search_window_start: body.searchWindowStart,
       p_search_window_end: body.searchWindowEnd,
@@ -85,6 +87,11 @@ export async function POST(request: NextRequest) {
       p_price_tolerance: body.priceTolerance,
       p_max_api_calls: body.maxApiCalls,
     };
+
+    if (body.originIata && body.destIata) {
+      params.p_origin_iata = body.originIata;
+      params.p_dest_iata = body.destIata;
+    }
 
     const { data, error } = await supabase.rpc('create_search_job', params);
 

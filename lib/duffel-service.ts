@@ -183,6 +183,8 @@ function calculateFarePenalty(offerFareBrand: string, offerBookingClass: string,
 
 function calculateApplesToApplesPenalty(originalBrand: string, newBrand: string): number {
   // Brand Tier Mapping: Light=1, Classic=2, Flex/Family=3
+  // NOTE: This function is deprecated. Parity penalties should be computed via
+  // the DB RPC compute_parity_penalty() for accurate per-carrier, per-passenger values.
   const TIER_MAP: Record<string, number> = {
     'light': 1,
     'basic': 1,
@@ -194,16 +196,21 @@ function calculateApplesToApplesPenalty(originalBrand: string, newBrand: string)
     'comfort': 3,
   };
   
-  const getTier = (brand: string): number => {
+  const getTier = (brand: string): number | null => {
     const lower = brand.toLowerCase();
     for (const [key, tier] of Object.entries(TIER_MAP)) {
       if (lower.includes(key)) return tier;
     }
-    return 2; // Default to Classic tier
+    return null;
   };
   
   const originalTier = getTier(originalBrand);
   const newTier = getTier(newBrand);
+  
+  // If either tier is unresolved, return 0 and let DB RPC handle it
+  if (originalTier === null || newTier === null) {
+    return 0;
+  }
   
   // Tier downgrade penalty: $150 for each tier level dropped
   if (originalTier > newTier) {
@@ -437,7 +444,7 @@ export async function searchDuffelOffers(params: {
       yieldDelta += farePenalty;
 
       // DB-Driven Parity Penalty (replaces hardcoded tierPenalty)
-      const anchorTier = params.anchorTier ?? 2;
+      const anchorTier = params.anchorTier ?? null;
       const candidateFamily = params.fareFamilyCache?.get(offerBookingClass);
       let tierPenalty = 0;
       let resolvedFamilyId: string | null = null;
@@ -450,7 +457,7 @@ export async function searchDuffelOffers(params: {
         resolvedFamilyName = candidateFamily.fare_family_name ?? null;
 
         // Only compute penalty if candidate tier is lower than anchor and both tiers are resolved
-        if (candidateTier !== null && candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
+        if (candidateTier !== null && anchorTier !== null && candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
           const adults = params.passengerAdults ?? 1;
           const children = params.passengerChildren ?? 0;
 

@@ -91,6 +91,16 @@ export function useClientSweep() {
     let searchJobId: string | null = null;
     let sweepExecutionId: string | null = null;
 
+    if (!snapTicket.carrier) {
+      addLog({ level: 'error', message: '[JOB INIT] CRITICAL: Missing carrier - cannot proceed with search' });
+      return { totalApiCalls: 0, totalScanned: 0, candidatesFound: 0 };
+    }
+
+    if (!snapTicket.origin || !snapTicket.destination) {
+      addLog({ level: 'error', message: '[JOB INIT] CRITICAL: Missing origin or destination - cannot proceed with search' });
+      return { totalApiCalls: 0, totalScanned: 0, candidatesFound: 0 };
+    }
+
     try {
       addLog({ level: 'info', message: '[JOB INIT] Creating search job via secure backend API...' });
 
@@ -102,11 +112,13 @@ export function useClientSweep() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticketId: snapTicket.dbTicketId || '',
-          pnr: snapTicket.pnr,
-          carrierIata: snapTicket.carrier || 'A3',
+          pnr: snapTicket.pnr || '',
+          carrierIata: snapTicket.carrier,
           bookingClass: snapTicket.bookingClass || 'Y',
+          originIata: snapTicket.origin,
+          destIata: snapTicket.destination,
           fareFamilyId: snapTicket.fareFamilyId || null,
-          parityTier: snapTicket.parityTier || null,
+          parityTier: snapTicket.parityTier ?? null,
           anchorBaseCost: baseCost,
           searchWindowStart,
           searchWindowEnd,
@@ -125,10 +137,11 @@ export function useClientSweep() {
         setSweepExecutionId(sweepExecutionId);
         addLog({ level: 'success', message: `[JOB INIT] ✓ Search Job created: ${searchJobId}` });
         addLog({ level: 'info', message: `[JOB INIT] Sweep Execution ID: ${sweepExecutionId}` });
-        addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${snapTicket.parityTier || 'default'} | Fare Family: ${snapTicket.fareFamilyName || 'unknown'}` });
+        addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${snapTicket.parityTier ?? 'default'} | Fare Family: ${snapTicket.fareFamilyName || 'unknown'}` });
       } else {
         const errorData = await response.json().catch(() => ({}));
-        addLog({ level: 'warning', message: `[JOB INIT] Failed to create search job: ${errorData.error || response.statusText} - continuing in local mode` });
+        console.error('[JOB INIT] API Error:', JSON.stringify(errorData, null, 2));
+        addLog({ level: 'warning', message: `[JOB INIT] Failed: ${errorData.error || response.statusText}${errorData.missingFields ? ` | Missing: ${errorData.missingFields.join(', ')}` : ''} - continuing in local mode` });
         const localExecId = `local-${Date.now()}`;
         setSweepExecutionId(localExecId);
         addLog({ level: 'info', message: `[JOB INIT] Using local execution ID: ${localExecId}` });
@@ -494,19 +507,24 @@ export function useClientSweep() {
 
       const searches = nodes.map(n => ({ departureDate: n.departureDate, returnDate: n.returnDate }));
 
+      if (!ticket.origin || !ticket.destination || !ticket.carrier) {
+        addLog({ level: 'error', message: `[CHUNK ERROR] Missing required ticket fields: origin=${ticket.origin}, destination=${ticket.destination}, carrier=${ticket.carrier}` });
+        return { apiCalls: searches.length, scanned: 0, rejected: 0, candidates: [] };
+      }
+
       try {
         const res = await fetch('/api/duffel-chunk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             searches,
-            origin: ticket.origin || 'CAI',
-            destination: ticket.destination || 'ATH',
+            origin: ticket.origin,
+            destination: ticket.destination,
             cabinClass: 'economy',
             passengerCount: ticket.passengers.length,
             baseCost,
             priceTolerance: config.priceTolerance,
-            originalCarrier: ticket.carrier || 'A3',
+            originalCarrier: ticket.carrier,
             directFlightOnly: config.directFlightOnly,
             fareFamilyCache,
             anchorFamilyId,
