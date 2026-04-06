@@ -17,6 +17,9 @@ export type TicketData = {
     passengerTypeSource?: string;
     manualOverride?: boolean;
   };
+  // Direct passenger counts for RPC calls (extracted from passengerBreakdown)
+  passengerAdults: number;
+  passengerChildren: number;
   rules: {
     validity: string;
     luggage: string;
@@ -78,6 +81,29 @@ export type FlightResult = {
   yieldDelta: number;
   status: string;
   fareBrand?: string;
+  bookingClass?: string;
+  resolvedFamilyId?: string | null;
+  resolvedFamilyName?: string | null;
+  parityTier?: number;
+  penaltyBadge?: string | null;
+  outboundSegments?: Array<{
+    origin: string;
+    destination: string;
+    departureTime: string;
+    arrivalTime: string;
+    carrier: string;
+    flightNumber: string;
+    duration: string;
+  }>;
+  inboundSegments?: Array<{
+    origin: string;
+    destination: string;
+    departureTime: string;
+    arrivalTime: string;
+    carrier: string;
+    flightNumber: string;
+    duration: string;
+  }>;
   metadata: Record<string, any>;
 };
 
@@ -118,6 +144,9 @@ const initialTicket: TicketData = {
   issueDate: null,
   expirationDate: null,
   departureDate: null,
+  passengerBreakdown: undefined,
+  passengerAdults: 1,
+  passengerChildren: 0,
   rules: {
     validity: '',
     luggage: '',
@@ -162,9 +191,15 @@ export const useTicketStore = create<TicketStore>()(
   searchJobId: null,
 
   setTicket: (ticket) =>
-    set((state) => ({
-      ticket: { ...state.ticket, ...ticket },
-    })),
+    set((state) => {
+      const updated = { ...state.ticket, ...ticket };
+      // Auto-extract passenger counts from passengerBreakdown when it changes
+      if (ticket.passengerBreakdown !== undefined) {
+        updated.passengerAdults = ticket.passengerBreakdown?.adults ?? 1;
+        updated.passengerChildren = ticket.passengerBreakdown?.children ?? 0;
+      }
+      return { ticket: updated };
+    }),
 
   setConfig: (config) =>
     set((state) => ({

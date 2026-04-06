@@ -20,6 +20,11 @@ interface ChunkRequest {
   priceTolerance: number;
   originalCarrier: string;
   directFlightOnly?: boolean;
+  fareFamilyCache?: Record<string, any>;
+  anchorFamilyId?: string | null;
+  anchorTier?: number | null;
+  passengerAdults?: number;
+  passengerChildren?: number;
 }
 
 let redis: Redis | null = null;
@@ -38,8 +43,18 @@ function getRedisClient(): Redis | null {
   return null;
 }
 
-function getCacheKey(search: ChunkSearch, origin: string, destination: string): string {
-  return `${origin}-${destination}-${search.departureDate}-${search.returnDate}`;
+function getCacheKey(
+  search: ChunkSearch,
+  origin: string,
+  destination: string,
+  anchorTier: number | null | undefined,
+  passengerAdults: number | undefined,
+  passengerChildren: number | undefined
+): string {
+  const tier = anchorTier ?? 0;
+  const adults = passengerAdults ?? 1;
+  const children = passengerChildren ?? 0;
+  return `${origin}-${destination}-${search.departureDate}-${search.returnDate}-N${tier}-A${adults}-C${children}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -77,7 +92,14 @@ export async function POST(request: NextRequest) {
 
     // Parallel execution: process all searches simultaneously
     const searchPromises = searches.map(async (search) => {
-      const cacheKey = getCacheKey(search, origin, destination);
+      const cacheKey = getCacheKey(
+        search,
+        origin,
+        destination,
+        body.anchorTier,
+        body.passengerAdults,
+        body.passengerChildren
+      );
       
       // Try cache first
       if (redisClient) {
@@ -102,6 +124,11 @@ export async function POST(request: NextRequest) {
       // Cache miss - fetch from Duffel
       cacheMisses++;
       try {
+        // Convert fareFamilyCache Record to Map if provided
+        const fareFamilyCacheMap = body.fareFamilyCache
+          ? new Map(Object.entries(body.fareFamilyCache))
+          : undefined;
+
         const result = await searchDuffelOffers({
           origin,
           destination,
@@ -116,6 +143,11 @@ export async function POST(request: NextRequest) {
             outboundTimePreference: 'any',
             inboundTimePreference: 'any',
           },
+          fareFamilyCache: fareFamilyCacheMap,
+          anchorFamilyId: body.anchorFamilyId,
+          anchorTier: body.anchorTier,
+          passengerAdults: body.passengerAdults,
+          passengerChildren: body.passengerChildren,
         });
 
         const filteredCandidates: FlightCandidate[] = [];

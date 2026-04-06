@@ -1,4 +1,5 @@
 import { Duffel } from '@duffel/api';
+import { supabase } from '@/lib/supabase';
 
 const DUFFEL_API_TIMEOUT_MS = 10000;
 
@@ -49,6 +50,11 @@ export interface FlightCandidate {
   outboundSegments: FlightSegment[];
   inboundSegments: FlightSegment[];
   fareBrand?: string;
+  bookingClass?: string;
+  resolvedFamilyId?: string | null;
+  resolvedFamilyName?: string | null;
+  parityTier?: number | null;
+  penaltyBadge?: string | null;
   metadata: {
     phase: string;
     segments: number;
@@ -56,6 +62,10 @@ export interface FlightCandidate {
     bookingClass: string;
     fareBrand?: string;
     tierPenalty?: number;
+    resolvedFamilyId?: string | null;
+    resolvedFamilyName?: string | null;
+    parityTier?: number | null;
+    penaltyBadge?: string | null;
     layoverDuration?: string;
     timePreferences?: {
       outbound?: { preference: string; actual: string } | null;
@@ -243,6 +253,11 @@ export async function searchDuffelOffers(params: {
   originalTicket?: OriginalTicketData;
   baseCost: number;
   preferences?: SearchPreferences;
+  fareFamilyCache?: Map<string, any>;
+  anchorFamilyId?: string | null;
+  anchorTier?: number | null;
+  passengerAdults?: number;
+  passengerChildren?: number;
 }): Promise<SearchResult> {
   if (!duffelClient) {
     console.warn('[Duffel] Client not configured - skipping search');
@@ -281,29 +296,22 @@ export async function searchDuffelOffers(params: {
   }
 
   try {
-    // Build passenger array with correct types (adult, child, infant)
+    // Build passenger array using snapshot values (passengerAdults, passengerChildren)
     const passengerArray: Array<{ type: 'adult' | 'child' | 'infant' }> = [];
-    const breakdown = preferences.passengerBreakdown;
+    const adults = params.passengerAdults ?? 1;
+    const children = params.passengerChildren ?? 0;
 
     // Add adults
-    const adultCount = breakdown?.adults ?? params.passengers;
-    for (let i = 0; i < adultCount; i++) {
+    for (let i = 0; i < adults; i++) {
       passengerArray.push({ type: 'adult' });
     }
 
-    // Add children if confirmed by source
-    if (breakdown?.children && breakdown?.children > 0) {
-      for (let i = 0; i < breakdown.children; i++) {
+    // Add children if present
+    if (children > 0) {
+      for (let i = 0; i < children; i++) {
         passengerArray.push({ type: 'child' });
       }
-      console.log(`[Duffel] Including ${breakdown.children} child passenger(s) - source verified: ${breakdown.passengerTypeSource}`);
-    }
-
-    // Add infants if present
-    if (breakdown?.infants && breakdown?.infants > 0) {
-      for (let i = 0; i < breakdown.infants; i++) {
-        passengerArray.push({ type: 'infant' });
-      }
+      console.log(`[Duffel] Including ${children} child passenger(s) - parity calculation adjusted`);
     }
 
     const allowedCarriers = params.originalTicket?.carrier ? [params.originalTicket.carrier] : undefined;
@@ -428,8 +436,42 @@ export async function searchDuffelOffers(params: {
       const farePenalty = calculateFarePenalty(fareBrand, offerBookingClass, params.originalTicket?.departureDate);
       yieldDelta += farePenalty;
 
-      const originalBrand = params.originalTicket?.brand || 'Standard';
-      const tierPenalty = calculateApplesToApplesPenalty(originalBrand, fareBrand);
+      // DB-Driven Parity Penalty (replaces hardcoded tierPenalty)
+      const anchorTier = params.anchorTier ?? 2;
+      const candidateFamily = params.fareFamilyCache?.get(offerBookingClass);
+      let tierPenalty = 0;
+      let resolvedFamilyId: string | null = null;
+      let resolvedFamilyName: string | null = null;
+      let candidateTier: number | null = null; // Initialize to null - unresolved fares must not masquerade as anchor-tier
+
+      if (candidateFamily) {
+        candidateTier = candidateFamily.parity_tier ?? null;
+        resolvedFamilyId = candidateFamily.fare_family_id ?? null;
+        resolvedFamilyName = candidateFamily.fare_family_name ?? null;
+
+        // Only compute penalty if candidate tier is lower than anchor and both tiers are resolved
+        if (candidateTier !== null && candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
+          const adults = params.passengerAdults ?? 1;
+          const children = params.passengerChildren ?? 0;
+
+          const { data: penalty, error: penaltyError } = await supabase.rpc('compute_parity_penalty', {
+            p_original_family_id: params.anchorFamilyId,
+            p_candidate_family_id: resolvedFamilyId,
+            p_passenger_adults: adults,
+            p_passenger_children: children,
+          });
+
+          if (penaltyError) {
+            console.warn(`[Duffel] compute_parity_penalty RPC failed: ${penaltyError.message}. Defaulting to 0.`);
+            tierPenalty = 0;
+          } else {
+            tierPenalty = (penalty as number) ?? 0;
+          }
+        }
+      } else {
+        console.warn(`[Duffel] No fare family found for booking class ${offerBookingClass}. Candidate tier unresolved.`);
+      }
+
       yieldDelta += tierPenalty;
 
       const outboundSegments: FlightSegment[] = outboundSlice.segments.map((seg: any) => ({
@@ -467,6 +509,10 @@ export async function searchDuffelOffers(params: {
         console.log(`[Duffel] ${status.toUpperCase()}: ${ownerCarrier} ${departureDate} | Δ$${roundedYieldDelta.toFixed(2)} exceeds tolerance $${priceTolerance}`);
       }
 
+      const penaltyBadge = tierPenalty > 0
+        ? `+€${tierPenalty.toFixed(0)} Tier Penalty`
+        : null;
+
       candidates.push({
         id: offer.id,
         carrier: ownerCarrier || 'XX',
@@ -479,13 +525,22 @@ export async function searchDuffelOffers(params: {
         outboundSegments,
         inboundSegments,
         fareBrand,
+        bookingClass: offerBookingClass,
+        resolvedFamilyId,
+        resolvedFamilyName,
+        parityTier: candidateTier,
+        penaltyBadge,
         metadata: {
           phase: 'LIVE DUFFEL',
           segments: outboundSlice.segments.length,
           cabinClass: offer.cabin_class || 'economy',
-          bookingClass: outboundSlice.fare_brand_name || offer.cabin_class || 'Y',
+          bookingClass: offerBookingClass,
           fareBrand,
           tierPenalty,
+          resolvedFamilyId,
+          resolvedFamilyName,
+          parityTier: candidateTier,
+          penaltyBadge,
           timePreferences: {
             outbound: outboundTimePreference !== 'any' ? { preference: outboundTimePreference, actual: getTimeSlot(outboundDepartureTime) } : null,
             inbound: inboundTimePreference !== 'any' ? { preference: inboundTimePreference, actual: getTimeSlot(inboundDepartureTime) } : null,
