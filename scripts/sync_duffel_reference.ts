@@ -63,9 +63,16 @@ interface CarrierRow {
   name: string;
   logo_lockup_url: string | null;
   logo_symbol_url: string | null;
+  logo_lockup_dark_url: string | null;
+  logo_symbol_dark_url: string | null;
   conditions_url: string | null;
   duffel_id: string;
   updated_at: string;
+}
+
+function generateDarkUrl(lightUrl: string | null | undefined): string | null {
+  if (!lightUrl) return null;
+  return lightUrl.replace('/for-light-background/', '/for-dark-background/');
 }
 
 function isValidIATACode(code: string | null): code is string {
@@ -228,6 +235,8 @@ async function main() {
       name: airline.name,
       logo_lockup_url: airline.logo_lockup_url || null,
       logo_symbol_url: airline.logo_symbol_url || null,
+      logo_lockup_dark_url: generateDarkUrl(airline.logo_lockup_url),
+      logo_symbol_dark_url: generateDarkUrl(airline.logo_symbol_url),
       conditions_url: airline.conditions_of_carriage_url || null,
       duffel_id: airline.id,
       updated_at: now,

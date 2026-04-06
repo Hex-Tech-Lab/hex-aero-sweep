@@ -112,6 +112,8 @@ export type CarrierInfo = {
   name: string;
   logo_symbol_url: string | null;
   logo_lockup_url: string | null;
+  logo_symbol_dark_url: string | null;
+  logo_lockup_dark_url: string | null;
 };
 
 type TicketStore = {

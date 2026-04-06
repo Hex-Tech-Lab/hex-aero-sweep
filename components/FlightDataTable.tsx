@@ -130,8 +130,8 @@ type FlightRowProps = {
     >
       <TableCell className={cn('font-mono font-semibold text-[10px] px-1', isOutOfRange ? 'text-slate-400' : 'text-slate-100')}>
         <span title={carrierInfo?.name || CARRIER_NAMES[flight.carrier] || flight.carrier}>
-          {carrierInfo?.logo_symbol_url ? (
-            <img src={carrierInfo.logo_symbol_url} alt={flight.carrier} className="w-6 h-6 object-contain" />
+          {carrierInfo?.logo_symbol_dark_url ? (
+            <img src={carrierInfo.logo_symbol_dark_url} alt={flight.carrier} className="w-6 h-6 object-contain" />
           ) : (
             flight.carrier
           )}
@@ -226,7 +226,7 @@ export function FlightDataTable() {
     );
     (async () => {
       try {
-        const { data } = await supabase.schema('airline').from('carriers').select('iata_code, name, logo_symbol_url, logo_lockup_url');
+        const { data } = await supabase.schema('airline').from('carriers').select('iata_code, name, logo_symbol_url, logo_lockup_url, logo_symbol_dark_url, logo_lockup_dark_url');
         if (data) setCarrierCache(data as CarrierInfo[]);
       } catch (e) {
         console.error('Failed to load carrier cache:', e);
@@ -667,9 +667,9 @@ export function FlightDataTable() {
           {selectedFlight && (
             <div className="p-4 space-y-4 overflow-x-hidden">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                {carrierCache.get(selectedFlight.carrier)?.logo_lockup_url ? (
+                {carrierCache.get(selectedFlight.carrier)?.logo_lockup_dark_url ? (
                   <img
-                    src={carrierCache.get(selectedFlight.carrier)!.logo_lockup_url!}
+                    src={carrierCache.get(selectedFlight.carrier)!.logo_lockup_dark_url!}
                     alt={selectedFlight.carrier}
                     className="h-8 object-contain shrink-0"
                   />
