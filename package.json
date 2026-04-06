@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:reference": "tsx scripts/sync_duffel_reference.ts",
+    "audit:db": "tsx scripts/verify_db_persistence.ts"
   },
   "dependencies": {
     "@duffel/api": "^4.22.0",
