@@ -53,7 +53,7 @@ export interface FlightCandidate {
   bookingClass?: string;
   resolvedFamilyId?: string | null;
   resolvedFamilyName?: string | null;
-  parityTier?: number;
+  parityTier?: number | null;
   penaltyBadge?: string | null;
   metadata: {
     phase: string;
@@ -64,7 +64,7 @@ export interface FlightCandidate {
     tierPenalty?: number;
     resolvedFamilyId?: string | null;
     resolvedFamilyName?: string | null;
-    parityTier?: number;
+    parityTier?: number | null;
     penaltyBadge?: string | null;
     layoverDuration?: string;
     timePreferences?: {
@@ -296,29 +296,22 @@ export async function searchDuffelOffers(params: {
   }
 
   try {
-    // Build passenger array with correct types (adult, child, infant)
+    // Build passenger array using snapshot values (passengerAdults, passengerChildren)
     const passengerArray: Array<{ type: 'adult' | 'child' | 'infant' }> = [];
-    const breakdown = preferences.passengerBreakdown;
+    const adults = params.passengerAdults ?? 1;
+    const children = params.passengerChildren ?? 0;
 
     // Add adults
-    const adultCount = breakdown?.adults ?? params.passengers;
-    for (let i = 0; i < adultCount; i++) {
+    for (let i = 0; i < adults; i++) {
       passengerArray.push({ type: 'adult' });
     }
 
-    // Add children if confirmed by source
-    if (breakdown?.children && breakdown?.children > 0) {
-      for (let i = 0; i < breakdown.children; i++) {
+    // Add children if present
+    if (children > 0) {
+      for (let i = 0; i < children; i++) {
         passengerArray.push({ type: 'child' });
       }
-      console.log(`[Duffel] Including ${breakdown.children} child passenger(s) - source verified: ${breakdown.passengerTypeSource}`);
-    }
-
-    // Add infants if present
-    if (breakdown?.infants && breakdown?.infants > 0) {
-      for (let i = 0; i < breakdown.infants; i++) {
-        passengerArray.push({ type: 'infant' });
-      }
+      console.log(`[Duffel] Including ${children} child passenger(s) - parity calculation adjusted`);
     }
 
     const allowedCarriers = params.originalTicket?.carrier ? [params.originalTicket.carrier] : undefined;
@@ -449,15 +442,15 @@ export async function searchDuffelOffers(params: {
       let tierPenalty = 0;
       let resolvedFamilyId: string | null = null;
       let resolvedFamilyName: string | null = null;
-      let candidateTier = anchorTier;
+      let candidateTier: number | null = null; // Initialize to null - unresolved fares must not masquerade as anchor-tier
 
       if (candidateFamily) {
-        candidateTier = candidateFamily.parity_tier ?? anchorTier;
+        candidateTier = candidateFamily.parity_tier ?? null;
         resolvedFamilyId = candidateFamily.fare_family_id ?? null;
         resolvedFamilyName = candidateFamily.fare_family_name ?? null;
 
-        // Only compute penalty if candidate tier is lower than anchor
-        if (candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
+        // Only compute penalty if candidate tier is lower than anchor and both tiers are resolved
+        if (candidateTier !== null && candidateTier < anchorTier && params.anchorFamilyId && resolvedFamilyId) {
           const adults = params.passengerAdults ?? 1;
           const children = params.passengerChildren ?? 0;
 
@@ -476,7 +469,7 @@ export async function searchDuffelOffers(params: {
           }
         }
       } else {
-        console.warn(`[Duffel] No fare family found for booking class ${offerBookingClass}. Defaulting penalty to 0.`);
+        console.warn(`[Duffel] No fare family found for booking class ${offerBookingClass}. Candidate tier unresolved.`);
       }
 
       yieldDelta += tierPenalty;

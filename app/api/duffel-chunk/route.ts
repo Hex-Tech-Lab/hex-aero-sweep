@@ -43,8 +43,18 @@ function getRedisClient(): Redis | null {
   return null;
 }
 
-function getCacheKey(search: ChunkSearch, origin: string, destination: string): string {
-  return `${origin}-${destination}-${search.departureDate}-${search.returnDate}`;
+function getCacheKey(
+  search: ChunkSearch,
+  origin: string,
+  destination: string,
+  anchorTier: number | null | undefined,
+  passengerAdults: number | undefined,
+  passengerChildren: number | undefined
+): string {
+  const tier = anchorTier ?? 0;
+  const adults = passengerAdults ?? 1;
+  const children = passengerChildren ?? 0;
+  return `${origin}-${destination}-${search.departureDate}-${search.returnDate}-N${tier}-A${adults}-C${children}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -82,7 +92,14 @@ export async function POST(request: NextRequest) {
 
     // Parallel execution: process all searches simultaneously
     const searchPromises = searches.map(async (search) => {
-      const cacheKey = getCacheKey(search, origin, destination);
+      const cacheKey = getCacheKey(
+        search,
+        origin,
+        destination,
+        body.anchorTier,
+        body.passengerAdults,
+        body.passengerChildren
+      );
       
       // Try cache first
       if (redisClient) {

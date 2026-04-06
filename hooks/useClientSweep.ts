@@ -251,7 +251,7 @@ export function useClientSweep() {
     }
 
     // Phase 2: EXPLOIT - Focus on cheapest nodes using UCB1 + surrounding dates
-    const remainingBudget = config.maxApiCalls - totalApiCalls;
+    const remainingBudget = snapConfig.maxApiCalls - totalApiCalls;
     const exploitationBudget = Math.floor(remainingBudget * 0.7);
 
     addLog({ level: 'info', message: `[EXPLOIT PHASE] Budget: ${exploitationBudget} calls | Focusing on promising nodes via UCB1...` });
@@ -619,8 +619,12 @@ export function useClientSweep() {
             raw_offer: null,
           }));
 
-          await bulkInsertSearchResults(searchResultRows);
-          addLog({ level: 'success', message: `[DB] Persisted ${searchResultRows.length} results to search_results` });
+          const insertSuccess = await bulkInsertSearchResults(searchResultRows);
+          if (insertSuccess) {
+            addLog({ level: 'success', message: `[DB] Persisted ${searchResultRows.length} results to search_results` });
+          } else {
+            addLog({ level: 'error', message: `[DB] Failed to persist search_results - see server logs` });
+          }
 
           // UPSERT price_calendar with cheapest normalized cost per (date, nights)
           const calendarMap = new Map<string, typeof allResults[0]>();
@@ -648,8 +652,12 @@ export function useClientSweep() {
             confidence: null,
           }));
 
-          await upsertPriceCalendar(calendarRows);
-          addLog({ level: 'success', message: `[DB] UPSERTed ${calendarRows.length} entries to price_calendar` });
+          const calendarSuccess = await upsertPriceCalendar(calendarRows);
+          if (calendarSuccess) {
+            addLog({ level: 'success', message: `[DB] UPSERTed ${calendarRows.length} entries to price_calendar` });
+          } else {
+            addLog({ level: 'error', message: `[DB] Failed to UPSERT price_calendar - see server logs` });
+          }
         } catch (dbError) {
           console.error('[DB] Failed to persist results:', dbError);
           addLog({ level: 'warning', message: `[DB] Failed to persist results to DB - see logs` });
