@@ -40,6 +40,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // Service role client bypasses RLS
+// Tables are in public schema (airline schema not yet created)
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     autoRefreshToken: false,
@@ -105,7 +106,7 @@ async function runAudit(): Promise<void> {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   const { data: latestJob, error: jobError } = await supabase
-    .from('airline.search_jobs')
+    .from('search_jobs')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -181,7 +182,7 @@ async function runAudit(): Promise<void> {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     const { data: searchResults, error: resultsError } = await supabase
-      .from('airline.search_results')
+      .from('search_results')
       .select('*')
       .eq('job_id', job.id)
       .order('created_at', { ascending: false });
@@ -252,7 +253,7 @@ async function runAudit(): Promise<void> {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
       const { data: calendarEntries, error: calendarError } = await supabase
-        .from('airline.price_calendar')
+        .from('price_calendar')
         .select('*')
         .eq('job_id', job.id)
         .order('outbound_date', { ascending: true });
