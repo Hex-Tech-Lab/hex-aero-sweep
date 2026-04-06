@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ChevronLeft, TriangleAlert as AlertTriangle, Plane, UserCheck, Baby, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, TriangleAlert as AlertTriangle, Plane, UserCheck, Baby, Sparkles, Route } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSearchLog } from '@/lib/supabase-operations';
 
@@ -286,6 +286,78 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
           <AlertDescription className="text-[11px]">
             <strong>CIRCUIT BREAKER:</strong> Ticket expired on{' '}
             {!isValidExpiration ? 'No Expiry Found' : expirationDate!.toISOString().split('T')[0]}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* FRESH MODE: Route Configuration */}
+      <Card className="p-4 border-cyan-900/50 bg-cyan-950/20 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Route className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wide">
+              Route Configuration
+            </h3>
+          </div>
+          <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
+            FRESH MODE
+          </Badge>
+        </div>
+        <p className="text-[10px] text-slate-400">
+          Required for manual searches. Pre-filled if ticket was parsed from PDF.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <Label htmlFor="origin" className="text-slate-400 text-xs mb-1">
+              Origin *
+            </Label>
+            <Input
+              id="origin"
+              type="text"
+              maxLength={3}
+              placeholder="e.g., CAI"
+              value={ticket.origin || ''}
+              onChange={(e) => setTicket({ origin: e.target.value.toUpperCase() })}
+              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
+            />
+          </div>
+          <div>
+            <Label htmlFor="destination" className="text-slate-400 text-xs mb-1">
+              Destination *
+            </Label>
+            <Input
+              id="destination"
+              type="text"
+              maxLength={3}
+              placeholder="e.g., ATH"
+              value={ticket.destination || ''}
+              onChange={(e) => setTicket({ destination: e.target.value.toUpperCase() })}
+              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
+            />
+          </div>
+          <div>
+            <Label htmlFor="carrier" className="text-slate-400 text-xs mb-1">
+              Carrier *
+            </Label>
+            <Input
+              id="carrier"
+              type="text"
+              maxLength={2}
+              placeholder="e.g., A3"
+              value={ticket.carrier || ''}
+              onChange={(e) => setTicket({ carrier: e.target.value.toUpperCase() })}
+              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Route Validation Warning */}
+      {(!ticket.origin || !ticket.destination || !ticket.carrier) && (
+        <Alert variant="destructive" className="py-2 border-red-900/50 bg-red-950/20">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <AlertDescription className="text-[11px] text-red-200">
+            <strong>Missing Route Data:</strong> You must provide Origin, Destination, and Carrier to initiate a sweep.
           </AlertDescription>
         </Alert>
       )}
@@ -590,7 +662,7 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
           </Button>
           <Button
             type="submit"
-            disabled={!isConfigValid() || (isTicketExpired() && !isRebookingMode()) || isSubmitting}
+            disabled={!isConfigValid() || !ticket.origin || !ticket.destination || !ticket.carrier || (isTicketExpired() && !isRebookingMode()) || isSubmitting}
             className="px-6 text-xs"
           >
             {isSubmitting ? 'Initializing...' : 'Orchestrate Sweep'}
