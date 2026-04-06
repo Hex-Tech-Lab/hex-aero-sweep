@@ -2,8 +2,7 @@ import { useCallback, useRef } from 'react';
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { useTelemetryStore } from '@/src/store/useTelemetryStore';
 import type { FlightResult } from '@/src/store/useTicketStore';
-import { createSearchJob, updateSearchJob } from '@/lib/supabase';
-import { loadFareFamilyCache, bulkInsertSearchResults, upsertPriceCalendar } from '@/lib/airline-intelligence';
+import { loadFareFamilyCache } from '@/lib/airline-intelligence';
 import type { FareFamilyCache, FareFamilyRow } from '@/types/airline';
 
 const CHUNK_SIZE = 4;
@@ -88,42 +87,48 @@ export function useClientSweep() {
     addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
     addLog({ level: 'info', message: `[SYSTEM] Budget: ${snapConfig.maxApiCalls} API calls | CHUNK_SIZE: ${CHUNK_SIZE}` });
 
-    // Phase 0: Initialize Search Job in Airline Intelligence Schema
+    // Phase 0: Initialize Search Job in Airline Intelligence Schema (via secure backend)
     let searchJobId: string | null = null;
     let sweepExecutionId: string | null = null;
 
     try {
-      addLog({ level: 'info', message: '[JOB INIT] Creating search job in Airline Intelligence Schema...' });
+      addLog({ level: 'info', message: '[JOB INIT] Creating search job via secure backend API...' });
 
       const searchWindowStart = snapConfig.searchWindowStart ? new Date(snapConfig.searchWindowStart).toISOString().split('T')[0] : '';
       const searchWindowEnd = snapConfig.searchWindowEnd ? new Date(snapConfig.searchWindowEnd).toISOString().split('T')[0] : '';
 
-      const jobResult = await createSearchJob({
-        p_ticket_id: snapTicket.dbTicketId || '',
-        p_pnr: snapTicket.pnr,
-        p_carrier_iata: snapTicket.carrier || 'A3',
-        p_booking_class: snapTicket.bookingClass || 'Y',
-        p_fare_family_id: snapTicket.fareFamilyId || null,
-        p_parity_tier: snapTicket.parityTier || null,
-        p_anchor_base_cost: baseCost,
-        p_search_window_start: searchWindowStart,
-        p_search_window_end: searchWindowEnd,
-        p_min_nights: snapConfig.minNights,
-        p_max_nights: snapConfig.maxNights,
-        p_price_tolerance: Number(snapConfig.priceTolerance),
-        p_max_api_calls: snapConfig.maxApiCalls,
+      const response = await fetch('/api/init-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId: snapTicket.dbTicketId || '',
+          pnr: snapTicket.pnr,
+          carrierIata: snapTicket.carrier || 'A3',
+          bookingClass: snapTicket.bookingClass || 'Y',
+          fareFamilyId: snapTicket.fareFamilyId || null,
+          parityTier: snapTicket.parityTier || null,
+          anchorBaseCost: baseCost,
+          searchWindowStart,
+          searchWindowEnd,
+          minNights: snapConfig.minNights,
+          maxNights: snapConfig.maxNights,
+          priceTolerance: Number(snapConfig.priceTolerance),
+          maxApiCalls: snapConfig.maxApiCalls,
+        }),
       });
 
-      if (jobResult) {
-        searchJobId = jobResult.id;
-        sweepExecutionId = jobResult.sweep_execution_id;
+      if (response.ok) {
+        const result = await response.json();
+        searchJobId = result.jobId;
+        sweepExecutionId = result.sweepExecutionId;
         setSearchJobId(searchJobId);
         setSweepExecutionId(sweepExecutionId);
         addLog({ level: 'success', message: `[JOB INIT] ✓ Search Job created: ${searchJobId}` });
         addLog({ level: 'info', message: `[JOB INIT] Sweep Execution ID: ${sweepExecutionId}` });
         addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${snapTicket.parityTier || 'default'} | Fare Family: ${snapTicket.fareFamilyName || 'unknown'}` });
       } else {
-        addLog({ level: 'warning', message: '[JOB INIT] Failed to create search job in DB - continuing in local mode' });
+        const errorData = await response.json().catch(() => ({}));
+        addLog({ level: 'warning', message: `[JOB INIT] Failed to create search job: ${errorData.error || response.statusText} - continuing in local mode` });
         const localExecId = `local-${Date.now()}`;
         setSweepExecutionId(localExecId);
         addLog({ level: 'info', message: `[JOB INIT] Using local execution ID: ${localExecId}` });
@@ -579,88 +584,31 @@ export function useClientSweep() {
         payload: { totalApiCalls, totalScanned, candidatesFound, phases: ['PROBE', 'EXPLOIT', 'FINALIZE'] },
       });
 
-      // Update search job status in DB
-      if (searchJobId) {
-        updateSearchJob(searchJobId, {
-          status: finalStatus,
-          total_scanned: totalScanned,
-          candidates_found: candidatesFound,
-          completed_at: new Date().toISOString(),
-        }).then(() => {
-          addLog({ level: 'info', message: `[JOB UPDATE] Search job ${searchJobId} marked as ${finalStatus}` });
-        }).catch(err => {
-          console.error('[JOB UPDATE] Failed to update search job:', err);
-        });
-      }
-
-      // Persist flight results to DB (batched) - using local snapshot to avoid race condition
-      const allResults = finalizedResults;
-      if (searchJobId && allResults.length > 0) {
+      // Send finalization request to chunk API for secure DB persistence
+      if (searchJobId && finalizedResults.length > 0) {
         try {
-          const searchResultRows = allResults.map(c => ({
-            job_id: searchJobId,
-            outbound_flight: c.outboundSegments?.[0]?.flightNumber || '',
-            inbound_flight: c.inboundSegments?.[0]?.flightNumber || '',
-            outbound_dep: c.departureDate || '',
-            inbound_dep: c.returnDate || '',
-            nights: c.nights,
-            carrier_iata: c.carrier,
-            booking_class_out: c.bookingClass || 'Y',
-            fare_family_name: c.resolvedFamilyName || 'Unknown',
-            base_fare_eur: c.price,
-            taxes_eur: 0,
-            total_raw_eur: c.price,
-            parity_total_penalty: c.metadata?.tierPenalty || 0,
-            total_normalized_eur: c.price + (c.metadata?.tierPenalty || 0),
-            net_saving_eur: baseCost - (c.price + (c.metadata?.tierPenalty || 0)),
-            is_saving: (baseCost - (c.price + (c.metadata?.tierPenalty || 0))) > 0,
-            status: c.status,
-            penalty_badge: c.penaltyBadge || null,
-            raw_offer: null,
-          }));
+          const persistResponse = await fetch('/api/duffel-chunk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              _action: 'finalize',
+              jobId: searchJobId,
+              results: finalizedResults,
+              baseCost,
+              finalStatus,
+              totalScanned,
+              candidatesFound,
+            }),
+          });
 
-          const insertSuccess = await bulkInsertSearchResults(searchResultRows);
-          if (insertSuccess) {
-            addLog({ level: 'success', message: `[DB] Persisted ${searchResultRows.length} results to search_results` });
+          if (persistResponse.ok) {
+            addLog({ level: 'success', message: `[DB] Results persisted via secure API for job ${searchJobId}` });
           } else {
-            addLog({ level: 'error', message: `[DB] Failed to persist search_results - see server logs` });
+            addLog({ level: 'warning', message: `[DB] Failed to persist results - see server logs` });
           }
-
-          // UPSERT price_calendar with cheapest normalized cost per (date, nights)
-          const calendarMap = new Map<string, typeof allResults[0]>();
-          for (const c of allResults) {
-            const key = `${c.departureDate}-${c.nights}`;
-            const existing = calendarMap.get(key);
-            const normalizedCost = c.price + (c.metadata?.tierPenalty || 0);
-            const existingCost = existing
-              ? existing.price + (existing.metadata?.tierPenalty || 0)
-              : Infinity;
-            if (normalizedCost < existingCost) {
-              calendarMap.set(key, c);
-            }
-          }
-
-          const calendarRows = Array.from(calendarMap.values()).map(c => ({
-            job_id: searchJobId,
-            outbound_date: c.departureDate,
-            nights: c.nights,
-            cheapest_raw: c.price,
-            cheapest_normalized: c.price + (c.metadata?.tierPenalty || 0),
-            fare_family: c.resolvedFamilyName || 'Unknown',
-            booking_class: c.bookingClass || 'Y',
-            data_source: 'DUFFEL' as const,
-            confidence: null,
-          }));
-
-          const calendarSuccess = await upsertPriceCalendar(calendarRows);
-          if (calendarSuccess) {
-            addLog({ level: 'success', message: `[DB] UPSERTed ${calendarRows.length} entries to price_calendar` });
-          } else {
-            addLog({ level: 'error', message: `[DB] Failed to UPSERT price_calendar - see server logs` });
-          }
-        } catch (dbError) {
-          console.error('[DB] Failed to persist results:', dbError);
-          addLog({ level: 'warning', message: `[DB] Failed to persist results to DB - see logs` });
+        } catch (persistError) {
+          console.error('[DB] Error persisting results:', persistError);
+          addLog({ level: 'warning', message: `[DB] Exception persisting results - continuing` });
         }
       }
 

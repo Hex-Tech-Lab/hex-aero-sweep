@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { searchDuffelOffers, FlightCandidate, OriginalTicketData } from '@/lib/duffel-service';
 
 export const runtime = 'nodejs';
@@ -27,7 +28,18 @@ interface ChunkRequest {
   passengerChildren?: number;
 }
 
+interface FinalizeRequest {
+  _action: 'finalize';
+  jobId: string;
+  results: any[];
+  baseCost: number;
+  finalStatus: string;
+  totalScanned: number;
+  candidatesFound: number;
+}
+
 let redis: Redis | null = null;
+let supabaseService: SupabaseClient | null = null;
 
 function getRedisClient(): Redis | null {
   if (redis) return redis;
@@ -38,6 +50,22 @@ function getRedisClient(): Redis | null {
   if (url && token) {
     redis = new Redis({ url, token });
     return redis;
+  }
+  
+  return null;
+}
+
+function getServiceRoleClient(): SupabaseClient | null {
+  if (supabaseService) return supabaseService;
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (supabaseUrl && serviceRoleKey) {
+    supabaseService = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    return supabaseService;
   }
   
   return null;
@@ -59,15 +87,28 @@ function getCacheKey(
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ChunkRequest = await request.json();
-    const { searches, origin, destination, cabinClass, passengerCount, originalCarrier, directFlightOnly } = body;
+    const contentType = request.headers.get('content-type') || '';
+    let body: ChunkRequest | FinalizeRequest;
+
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else {
+      return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 400 });
+    }
+
+    if ('_action' in body && body._action === 'finalize') {
+      return handleFinalize(body as FinalizeRequest);
+    }
+
+    const chunkBody = body as ChunkRequest;
+    const { searches, origin, destination, cabinClass, passengerCount, originalCarrier, directFlightOnly } = chunkBody;
 
     if (!searches || !Array.isArray(searches)) {
       return NextResponse.json({ error: 'Invalid request: searches array required' }, { status: 400 });
     }
 
-    const baseCost = Number(body.baseCost);
-    const priceTolerance = Number(body.priceTolerance);
+    const baseCost = Number(chunkBody.baseCost);
+    const priceTolerance = Number(chunkBody.priceTolerance);
     const maxAcceptablePrice = baseCost + priceTolerance;
     
     const originalTicketData: OriginalTicketData = {
@@ -90,18 +131,16 @@ export async function POST(request: NextRequest) {
       fromCache?: boolean;
     }[] = [];
 
-    // Parallel execution: process all searches simultaneously
     const searchPromises = searches.map(async (search) => {
       const cacheKey = getCacheKey(
         search,
         origin,
         destination,
-        body.anchorTier,
-        body.passengerAdults,
-        body.passengerChildren
+        chunkBody.anchorTier,
+        chunkBody.passengerAdults,
+        chunkBody.passengerChildren
       );
       
-      // Try cache first
       if (redisClient) {
         try {
           const cached = await redisClient.get<string>(cacheKey);
@@ -121,12 +160,10 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Cache miss - fetch from Duffel
       cacheMisses++;
       try {
-        // Convert fareFamilyCache Record to Map if provided
-        const fareFamilyCacheMap = body.fareFamilyCache
-          ? new Map(Object.entries(body.fareFamilyCache))
+        const fareFamilyCacheMap = chunkBody.fareFamilyCache
+          ? new Map(Object.entries(chunkBody.fareFamilyCache))
           : undefined;
 
         const result = await searchDuffelOffers({
@@ -144,10 +181,10 @@ export async function POST(request: NextRequest) {
             inboundTimePreference: 'any',
           },
           fareFamilyCache: fareFamilyCacheMap,
-          anchorFamilyId: body.anchorFamilyId,
-          anchorTier: body.anchorTier,
-          passengerAdults: body.passengerAdults,
-          passengerChildren: body.passengerChildren,
+          anchorFamilyId: chunkBody.anchorFamilyId,
+          anchorTier: chunkBody.anchorTier,
+          passengerAdults: chunkBody.passengerAdults,
+          passengerChildren: chunkBody.passengerChildren,
         });
 
         const filteredCandidates: FlightCandidate[] = [];
@@ -177,7 +214,6 @@ export async function POST(request: NextRequest) {
           rejectedCount: result.rejectedCount,
         };
         
-        // Store in cache (24 hour expiry)
         if (redisClient) {
           try {
             await redisClient.set(cacheKey, JSON.stringify(response), { ex: 86400 });
@@ -222,4 +258,116 @@ export async function POST(request: NextRequest) {
     console.error('[Chunk API] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+async function handleFinalize(body: FinalizeRequest) {
+  const { jobId, results, baseCost, finalStatus, totalScanned, candidatesFound } = body;
+
+  console.log(`[Chunk API] Finalize action for job ${jobId}: ${results.length} results`);
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    console.error('[Chunk API] Service role client unavailable');
+    return NextResponse.json({ error: 'Database client unavailable' }, { status: 503 });
+  }
+
+  try {
+    await supabase.rpc('update_search_job', {
+      p_job_id: jobId,
+      p_status: finalStatus,
+      p_total_scanned: totalScanned,
+      p_candidates_found: candidatesFound,
+      p_completed_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('[Chunk API] Failed to update search job status:', err);
+  }
+
+  if (results.length === 0) {
+    return NextResponse.json({ success: true, persisted: 0 });
+  }
+
+  const searchResultRows = results.map((c: any) => ({
+    job_id: jobId,
+    outbound_flight: c.outboundSegments?.[0]?.flightNumber || '',
+    inbound_flight: c.inboundSegments?.[0]?.flightNumber || '',
+    outbound_dep: c.departureDate || '',
+    inbound_dep: c.returnDate || '',
+    nights: c.nights,
+    carrier_iata: c.carrier,
+    booking_class_out: c.bookingClass || 'Y',
+    fare_family_name: c.resolvedFamilyName || 'Unknown',
+    base_fare_eur: c.price,
+    taxes_eur: 0,
+    total_raw_eur: c.price,
+    parity_total_penalty: c.metadata?.tierPenalty || 0,
+    total_normalized_eur: c.price + (c.metadata?.tierPenalty || 0),
+    net_saving_eur: baseCost - (c.price + (c.metadata?.tierPenalty || 0)),
+    is_saving: (baseCost - (c.price + (c.metadata?.tierPenalty || 0))) > 0,
+    status: c.status,
+    penalty_badge: c.penaltyBadge || null,
+    raw_offer: null,
+  }));
+
+  const BATCH_SIZE = 50;
+  let persistedCount = 0;
+
+  for (let i = 0; i < searchResultRows.length; i += BATCH_SIZE) {
+    const batch = searchResultRows.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase
+      .from('search_results')
+      .insert(batch);
+
+    if (error) {
+      console.error(`[Chunk API] search_results batch insert failed:`, error);
+    } else {
+      persistedCount += batch.length;
+    }
+  }
+
+  const calendarMap = new Map<string, any>();
+  for (const c of results) {
+    const key = `${c.departureDate}-${c.nights}`;
+    const existing = calendarMap.get(key);
+    const normalizedCost = c.price + (c.metadata?.tierPenalty || 0);
+    const existingCost = existing
+      ? existing.price + (existing.metadata?.tierPenalty || 0)
+      : Infinity;
+    if (normalizedCost < existingCost) {
+      calendarMap.set(key, c);
+    }
+  }
+
+  const calendarRows = Array.from(calendarMap.values()).map((c: any) => ({
+    job_id: jobId,
+    outbound_date: c.departureDate,
+    nights: c.nights,
+    cheapest_raw: c.price,
+    cheapest_normalized: c.price + (c.metadata?.tierPenalty || 0),
+    fare_family: c.resolvedFamilyName || 'Unknown',
+    booking_class: c.bookingClass || 'Y',
+    data_source: 'DUFFEL' as const,
+    confidence: null,
+  }));
+
+  if (calendarRows.length > 0) {
+    const { error } = await supabase
+      .from('price_calendar')
+      .upsert(calendarRows, {
+        onConflict: 'job_id,outbound_date,nights',
+        ignoreDuplicates: false,
+      });
+
+    if (error) {
+      console.error(`[Chunk API] price_calendar upsert failed:`, error);
+    }
+  }
+
+  console.log(`[Chunk API] Persisted ${persistedCount} results + ${calendarRows.length} calendar entries for job ${jobId}`);
+
+  return NextResponse.json({
+    success: true,
+    persisted: persistedCount,
+    calendarEntries: calendarRows.length,
+  });
 }
