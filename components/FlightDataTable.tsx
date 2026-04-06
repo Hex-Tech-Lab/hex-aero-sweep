@@ -209,7 +209,7 @@ type FlightRowProps = {
 type PresetFilter = 'All' | 'Top Matches' | 'Cheapest' | 'Shortest';
 
 export function FlightDataTable() {
-  const { flightResults, ticket, carrierCache, setCarrierCache } = useTicketStore();
+  const { flightResults, ticket, carrierCache, setCarrierCache, searchJobId, metrics } = useTicketStore();
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'yieldDelta', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -568,7 +568,13 @@ export function FlightDataTable() {
                   <div className="flex flex-col items-center gap-2">
                     <Plane className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-wider">
-                      {filterText ? 'No matching results' : (filteredAndSortedFlights.length === 0 ? '0 Matches Found. All scanned candidates were rejected by the Circuit Breaker.' : 'Awaiting Candidate Stream...')}
+                      {!searchJobId || searchJobId.startsWith('local-')
+                        ? 'Awaiting Execution'
+                        : filterText
+                          ? 'No matching results'
+                          : filteredAndSortedFlights.length === 0
+                            ? '0 Matches Found. All scanned candidates were rejected by the Circuit Breaker.'
+                            : 'Awaiting Candidate Stream...'}
                     </span>
                   </div>
                 </TableCell>

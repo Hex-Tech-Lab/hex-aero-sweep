@@ -7,6 +7,13 @@ import type { FareFamilyCache, FareFamilyRow } from '@/types/airline';
 
 const CHUNK_SIZE = 4;
 
+class SweepInitializationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SweepInitializationError';
+  }
+}
+
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -82,6 +89,7 @@ export function useClientSweep() {
 
     clearLogs();
     clearFlightResults();
+    useTelemetryStore.getState().clearLogs();
     setMetrics({ totalScanned: 0, candidatesFound: 0, outOfRange: 0, status: 'running', progress: `0 / ${snapConfig.maxApiCalls}`, apiCallsMade: 0, maxApiCalls: snapConfig.maxApiCalls });
 
     addLog({ level: 'info', message: '[SYSTEM] AEROSWEEP v7.1 UCB1 ORCHESTRATOR ONLINE' });
@@ -140,17 +148,21 @@ export function useClientSweep() {
         addLog({ level: 'info', message: `[JOB INIT] Anchor Tier: ${snapTicket.parityTier ?? 'default'} | Fare Family: ${snapTicket.fareFamilyName || 'unknown'}` });
       } else {
         const errorData = await response.json().catch(() => ({}));
+        const errorMsg = `[JOB INIT] CRITICAL: API Error ${response.status}: ${errorData.error || response.statusText}`;
         console.error('[JOB INIT] API Error:', JSON.stringify(errorData, null, 2));
-        addLog({ level: 'warning', message: `[JOB INIT] Failed: ${errorData.error || response.statusText}${errorData.missingFields ? ` | Missing: ${errorData.missingFields.join(', ')}` : ''} - continuing in local mode` });
-        const localExecId = `local-${Date.now()}`;
-        setSweepExecutionId(localExecId);
-        addLog({ level: 'info', message: `[JOB INIT] Using local execution ID: ${localExecId}` });
+        addLog({ level: 'error', message: errorMsg });
+        addLog({ level: 'error', message: '[JOB INIT] ABORTING: Database tunnel failure - cannot proceed with silent local execution' });
+        throw new SweepInitializationError(`${errorMsg} | Cannot proceed without DB connection`);
       }
     } catch (jobError) {
-      console.error('[JOB INIT] Error creating search job:', jobError);
-      addLog({ level: 'warning', message: '[JOB INIT] Exception creating search job - continuing in local mode' });
-      const localExecId = `local-${Date.now()}`;
-      setSweepExecutionId(localExecId);
+      if (jobError instanceof SweepInitializationError) {
+        throw jobError;
+      }
+      console.error('[JOB INIT] Exception creating search job:', jobError);
+      const errorMsg = `[JOB INIT] CRITICAL: ${jobError instanceof Error ? jobError.message : 'Unknown error'}`;
+      addLog({ level: 'error', message: errorMsg });
+      addLog({ level: 'error', message: '[JOB INIT] ABORTING: Database tunnel failure - cannot proceed with silent local execution' });
+      throw new SweepInitializationError(errorMsg);
     }
 
     // Phase 0b: Load Fare Family Cache ONCE (12 parallel RPCs, not N per candidate)

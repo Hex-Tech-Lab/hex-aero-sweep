@@ -2,10 +2,11 @@
 
 import { useTicketStore } from '@/src/store/useTicketStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Activity } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { createClient } from '@supabase/supabase-js';
 
 const BIN_SIZE = 5;
 
@@ -41,9 +42,47 @@ function binData(data: { date: string; price: number; yieldDelta: number }[], bi
 }
 
 export function VolatilityChart() {
-  const { flightResults, ticket } = useTicketStore();
+  const { flightResults, ticket, searchJobId } = useTicketStore();
+  const [dbCalendarData, setDbCalendarData] = useState<{ search_date: string; cheapest_normalized: number }[]>([]);
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
+
+  useEffect(() => {
+    if (!searchJobId || searchJobId.startsWith('local-')) {
+      setDbCalendarData([]);
+      return;
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || ''
+    );
+
+    setIsLoadingDb(true);
+    supabase
+      .from('price_calendar')
+      .select('search_date, cheapest_normalized')
+      .eq('job_id', searchJobId)
+      .order('search_date', { ascending: true })
+      .then(({ data, error }) => {
+        setIsLoadingDb(false);
+        if (error) {
+          console.error('[PriceCalendar] DB fetch error:', error);
+          return;
+        }
+        if (data) {
+          setDbCalendarData(data);
+        }
+      });
+  }, [searchJobId]);
 
   const chartData = useMemo(() => {
+    if (dbCalendarData.length > 0) {
+      return binData(
+        dbCalendarData.map(d => ({ date: d.search_date, price: d.cheapest_normalized, yieldDelta: 0 })),
+        BIN_SIZE
+      );
+    }
+
     if (flightResults.length === 0) return [];
 
     const sorted = [...flightResults]
@@ -57,7 +96,7 @@ export function VolatilityChart() {
       sorted.map(f => ({ date: f.departureDate, price: f.price, yieldDelta: f.yieldDelta })),
       BIN_SIZE
     );
-  }, [flightResults]);
+  }, [flightResults, dbCalendarData]);
 
   const volatilityMetrics = useMemo(() => {
     const verifiedFlights = flightResults.filter(f => f.status === 'verified' || f.status === 'live');
@@ -118,7 +157,16 @@ export function VolatilityChart() {
       )}
 
       <ResponsiveContainer width="100%" height={120}>
-        {chartData.length === 0 ? (
+        {isLoadingDb ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.5 }}
+            className="flex flex-col items-center justify-center h-full bg-slate-800/30 rounded"
+          >
+            <Activity className="w-6 h-6 mb-1 text-cyan-500 animate-pulse" />
+            <span className="text-[9px] uppercase tracking-wider text-cyan-500">Syncing...</span>
+          </motion.div>
+        ) : chartData.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: [0.3, 0.6, 0.3] }}
@@ -126,7 +174,9 @@ export function VolatilityChart() {
             className="flex flex-col items-center justify-center h-full text-slate-600"
           >
             <Activity className="w-6 h-6 mb-1" />
-            <span className="text-[9px] uppercase tracking-wider">Awaiting...</span>
+            <span className="text-[9px] uppercase tracking-wider">
+              {!searchJobId || searchJobId.startsWith('local-') ? 'AWAITING DB SYNC' : 'Awaiting...'}
+            </span>
           </motion.div>
         ) : (
           <LineChart data={chartData} margin={{ top: 2, right: 8, left: -15, bottom: 35 }}>
