@@ -118,6 +118,9 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
         pnr: result.data.pnr,
         primaryPassengerLastName: result.data.primaryPassengerLastName,
         passengers: result.data.passengers,
+        carrier: result.data.carrier || ticket.carrier,
+        origin: result.data.origin || ticket.origin,
+        destination: result.data.destination || ticket.destination,
         fareClass: result.data.fareClass,
         baseCost: result.data.baseCost,
         issueDate: new Date(result.data.issueDate),
@@ -219,9 +222,9 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
         pnr: ticketData.pnr,
         primaryPassengerLastName: ticket.primaryPassengerLastName,
         passengers: [`${ticketData.rawOrderData?.passengers?.[0]?.given_name || 'PASSENGER'} ${ticketData.rawOrderData?.passengers?.[0]?.family_name || ''}`],
-        carrier: ticketData.carrier,
-        origin: ticketData.origin,
-        destination: ticketData.destination,
+        carrier: ticketData.carrier || ticket.carrier,
+        origin: ticketData.origin || ticket.origin,
+        destination: ticketData.destination || ticket.destination,
         bookingClass: ticketData.bookingClass,
         fareClass: ticketData.rawOrderData?.cabinClass?.toUpperCase() || 'ECONOMY',
         baseCost: parseFloat(ticketData.rawOrderData?.totalAmount) || 0,
@@ -239,6 +242,14 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
           luggage: 'Check carrier policy',
           cancellation: ticketData.rawOrderData?.fareBrand || 'Subject to fare rules',
         },
+      });
+
+      console.log('[IntakeStep] Store state after PNR sync:', {
+        pnr: ticketData.pnr,
+        carrier: ticketData.carrier,
+        origin: ticketData.origin,
+        destination: ticketData.destination,
+        bookingClass: ticketData.bookingClass,
       });
 
       setIsParsing(false);
@@ -326,6 +337,12 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
         luggage: 'Check carrier policy',
         cancellation: 'Subject to fare rules',
       },
+    });
+
+    console.log('[IntakeStep] Store state after Fresh Mode:', {
+      carrier,
+      origin,
+      destination,
     });
 
     setProcessingState('authenticated');

@@ -58,19 +58,21 @@ export function DatePicker({
           {date ? format(date, "dd-MMM-yyyy") : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 bg-slate-950 border-slate-800" align="start">
-        <Calendar
-          mode="single"
-          selected={date || undefined}
-          onSelect={handleSelect}
-          defaultMonth={resolvedDefaultMonth}
-          disabled={(dateToCheck) => {
-            if (minDate && dateToCheck < minDate) return true;
-            if (maxDate && dateToCheck > maxDate) return true;
-            return false;
-          }}
-          className="bg-slate-950"
-        />
+      <PopoverContent className="w-auto p-0 bg-slate-950 border-slate-800" align="start" side="bottom" sideOffset={4}>
+        <div className="h-[340px] flex flex-col">
+          <Calendar
+            mode="single"
+            selected={date || undefined}
+            onSelect={handleSelect}
+            defaultMonth={resolvedDefaultMonth}
+            disabled={(dateToCheck) => {
+              if (minDate && dateToCheck < minDate) return true;
+              if (maxDate && dateToCheck > maxDate) return true;
+              return false;
+            }}
+            className="bg-slate-950"
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );
