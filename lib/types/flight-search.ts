@@ -23,6 +23,8 @@ export interface DuffelQuery {
   };
 }
 
+import type { TierRank } from '../constants/rebooking-budget';
+
 export interface ExploitResult {
   arm: number;
   outbound_date: string;
@@ -30,7 +32,7 @@ export interface ExploitResult {
   total_price_usd: number;
   net_cost: number;
   percent_overage: number;
-  tier: 'TIER_1_STRICT' | 'TIER_2_SOFT' | 'TIER_3_LAST_RESORT';
+  tier: TierRank;
   flights: {
     outbound_flight_id: string;
     return_flight_id: string;
