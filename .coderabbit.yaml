@@ -1,14 +1,7 @@
-# .coderabbit.yaml
-rules:
-  - type: pattern
-    patterns:
-      - '**'  # Review ALL files
-    exclude:
-      - '**/*.lock'
-      - '**/.env'
-      - '**/node_modules/**'
-      - '**/.next/**'
-
-path_filters:
-  enabled: true
-  exclude: []  # Override defaults — review everything
+reviews:
+  path_filters:
+    - '**'
+    - '!**/*.lock'
+    - '!**/.env'
+    - '!**/node_modules/**'
+    - '!**/.next/**'
