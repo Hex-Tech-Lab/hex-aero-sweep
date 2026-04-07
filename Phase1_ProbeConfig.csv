@@ -1,0 +1,12 @@
+Arm#,Week_Start,Outbound_Date,Day_of_Week,Season_Tag,Price_Tier,UCB1_Weight,Rationale
+1,Jun 18,Jun 18,Tue,Shoulder,Low,0.7,Shoulder season weekday baseline
+2,Jun 25,Jun 25,Tue,Shoulder,Low,0.7,Shoulder season continues strong discount
+3,Jul 2,Jul 2,Tue,Shoulder,Low,0.7,End of shoulder pre-peak weekday advantage
+4,Jul 9,Jul 9,Tue,Pre-Peak,Low-Med,0.5,Pre-peak begins slight premium reasonable
+5,Jul 16,Jul 16,Tue,Pre-Peak,Medium,0.4,Approaching peak season higher prices expected
+6,Jul 23,Jul 21,Mon,Peak,High,0.2,PEAK SEASON avoid Tue-Thu use Monday for discount
+7,Jul 30,Jul 30,Tue,High,High,0.2,Post-peak decline begins still elevated prices
+8,Aug 6,Aug 6,Tue,High,High,0.3,High season modest UCB weight for exploration
+9,Aug 13,Aug 13,Tue,High→Sweet,Medium,0.5,Transition to sweet spot lower uncertainty
+10,Aug 20,Aug 20,Tue,Sweet-Spot,Low,0.9,PRIME ARM post-summer shoulder maximum confidence
+11,Aug 27,Aug 26,Mon,Sweet-Spot,Low,0.9,SECONDARY PRIME return by Sep 2 post-summer discount
