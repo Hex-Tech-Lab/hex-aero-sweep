@@ -82,6 +82,7 @@ export type FlightResult = {
   status: string;
   fareBrand?: string;
   bookingClass?: string;
+  fareBasisCode?: string;
   resolvedFamilyId?: string | null;
   resolvedFamilyName?: string | null;
   parityTier?: number;
@@ -104,7 +105,9 @@ export type FlightResult = {
     flightNumber: string;
     duration: string;
   }>;
-  metadata: Record<string, any>;
+  metadata: Record<string, any> & {
+    fareBasisCode?: string;
+  };
 };
 
 export type CarrierInfo = {

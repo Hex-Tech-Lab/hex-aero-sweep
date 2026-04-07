@@ -51,6 +51,7 @@ export interface FlightCandidate {
   inboundSegments: FlightSegment[];
   fareBrand?: string;
   bookingClass?: string;
+  fareBasisCode?: string;
   resolvedFamilyId?: string | null;
   resolvedFamilyName?: string | null;
   parityTier?: number | null;
@@ -60,6 +61,7 @@ export interface FlightCandidate {
     segments: number;
     cabinClass: string;
     bookingClass: string;
+    fareBasisCode?: string;
     fareBrand?: string;
     tierPenalty?: number;
     resolvedFamilyId?: string | null;
@@ -565,6 +567,7 @@ export async function searchDuffelOffers(params: {
         inboundSegments,
         fareBrand,
         bookingClass: offerBookingClass,
+        fareBasisCode,
         resolvedFamilyId,
         resolvedFamilyName,
         parityTier: candidateTier,
@@ -574,6 +577,7 @@ export async function searchDuffelOffers(params: {
           segments: outboundSlice.segments.length,
           cabinClass: offer.cabin_class || 'economy',
           bookingClass: offerBookingClass,
+          fareBasisCode,
           fareBrand,
           tierPenalty,
           resolvedFamilyId,

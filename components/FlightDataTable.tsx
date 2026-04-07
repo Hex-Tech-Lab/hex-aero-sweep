@@ -154,7 +154,7 @@ type FlightRowProps = {
         <span className={cn('text-[10px] font-mono uppercase', 
           isOutOfRange ? 'text-slate-600' : 'text-slate-400'
         )}>
-          {flight.metadata?.bookingClass || '-'}
+          {flight.bookingClass || '-'}
         </span>
       </TableCell>
       <TableCell className="px-1">
@@ -171,6 +171,13 @@ type FlightRowProps = {
         >
           {fb}
         </Badge>
+      </TableCell>
+      <TableCell className="text-center px-1">
+        <span className={cn('text-[9px] font-mono uppercase tracking-tight', 
+          isOutOfRange ? 'text-slate-600' : 'text-cyan-400/70'
+        )}>
+          {flight.metadata?.fareBasisCode || flight.fareBasisCode || '-'}
+        </span>
       </TableCell>
       <TableCell className="text-center px-1">
         <span className="text-[10px] font-mono text-slate-400">
@@ -554,6 +561,7 @@ export function FlightDataTable() {
               </TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1 text-center">Class</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Brand</TableHead>
+              <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1 text-center">Basis</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1 text-center">Nights</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase px-1">Key Cond.</TableHead>
               <TableHead className="text-slate-500 font-medium text-[9px] uppercase text-right cursor-pointer hover:text-slate-400 px-1" onClick={() => handleSort('price')}>
