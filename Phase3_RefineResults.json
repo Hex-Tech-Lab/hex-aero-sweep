@@ -1,0 +1,157 @@
+{
+  "session_id": "REFINE_EXPANDED_WINDOW_2026_04_07",
+  "objective": "Find Family/T fares ≤$862.87 by exploring shoulder seasons",
+  "original_booking": {
+    "fare_family": "Family",
+    "booking_class": "T",
+    "total_price_usd": 792.87,
+    "airline": "Aegean A3",
+    "route": "CAI-ATH roundtrip",
+    "passengers": "2 adults + 2 children (ages 2, 11)"
+  },
+  "budget_constraint": {
+    "original": 792.87,
+    "tolerance_usd": 70,
+    "ceiling_usd": 862.87,
+    "tier_1_max": 862.87,
+    "tier_2_max": 900
+  },
+  "exploit_baseline": {
+    "cheapest_found": 906.09,
+    "dates": "2026-08-22 to 2026-08-29",
+    "overage_usd": 113.22,
+    "overage_pct": 14.3,
+    "tier": "TIER_3_LAST_RESORT"
+  },
+  "execution_time": {
+    "start": "2026-04-07T20:35:31.043Z",
+    "end": "2026-04-07T20:36:43.391Z",
+    "duration_minutes": 1.2
+  },
+  "refine_arms": [
+    {
+      "arm_id": "A",
+      "outbound": "2026-06-24",
+      "return": "2026-06-28",
+      "trip_days": 5,
+      "season": "Late June (Pre-peak)",
+      "total_price_usd": 1203.92,
+      "net_cost": 411.05000000000007,
+      "percent_overage": 51.84330344192618,
+      "tier": "TIER_3_LAST_RESORT",
+      "offer_id": "off_0000B53t9H5vSlzgkJ8Ul1",
+      "fare_brand": "Economy Best Buy",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    },
+    {
+      "arm_id": "B",
+      "outbound": "2026-06-25",
+      "return": "2026-07-02",
+      "trip_days": 7,
+      "season": "Late June/Early July",
+      "total_price_usd": 866.05,
+      "net_cost": 73.17999999999995,
+      "percent_overage": 9.229760238122259,
+      "tier": "TIER_2_SOFT",
+      "offer_id": "off_0000B53tA1LiI4BCS5GLj1",
+      "fare_brand": "Light",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    },
+    {
+      "arm_id": "C",
+      "outbound": "2026-07-08",
+      "return": "2026-07-12",
+      "trip_days": 5,
+      "season": "Early July",
+      "total_price_usd": 1203.92,
+      "net_cost": 411.05000000000007,
+      "percent_overage": 51.84330344192618,
+      "tier": "TIER_3_LAST_RESORT",
+      "offer_id": "off_0000B53tBknxpOqKUmywzK",
+      "fare_brand": "Economy Best Buy",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    },
+    {
+      "arm_id": "D",
+      "outbound": "2026-07-09",
+      "return": "2026-07-16",
+      "trip_days": 7,
+      "season": "Early July",
+      "total_price_usd": 1203.92,
+      "net_cost": 411.05000000000007,
+      "percent_overage": 51.84330344192618,
+      "tier": "TIER_3_LAST_RESORT",
+      "offer_id": "off_0000B53tCsed4fTsM0TSHW",
+      "fare_brand": "Economy Best Buy",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    },
+    {
+      "arm_id": "E",
+      "outbound": "2026-09-03",
+      "return": "2026-09-07",
+      "trip_days": 5,
+      "season": "Early September (Post-summer)",
+      "total_price_usd": 790.36,
+      "net_cost": -2.509999999999991,
+      "percent_overage": -0.3165714429856081,
+      "tier": "TIER_1_STRICT",
+      "offer_id": "off_0000B53tDeJhrlGWB13QLX",
+      "fare_brand": "Light",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    },
+    {
+      "arm_id": "F",
+      "outbound": "2026-09-04",
+      "return": "2026-09-11",
+      "trip_days": 7,
+      "season": "Early September",
+      "total_price_usd": 790.36,
+      "net_cost": -2.509999999999991,
+      "percent_overage": -0.3165714429856081,
+      "tier": "TIER_1_STRICT",
+      "offer_id": "off_0000B53tEWLKzuejjiEUNS",
+      "fare_brand": "Light",
+      "booking_class": "T",
+      "status": "SUCCESS",
+      "availability_note": "Family/T fare confirmed"
+    }
+  ],
+  "tier_summary": {
+    "tier_1_count": 2,
+    "tier_2_count": 1,
+    "tier_3_count": 3,
+    "no_family_offers_count": 0,
+    "total_options": 6
+  },
+  "best_option_overall": {
+    "arm_id": "E",
+    "dates": "2026-09-03 to 2026-09-07",
+    "price": 790.36,
+    "net_cost": -2.509999999999991,
+    "percent_overage": -0.3165714429856081,
+    "tier": "TIER_1_STRICT",
+    "savings_vs_exploit": 115.73000000000002
+  },
+  "seasonality_analysis": {
+    "late_june_avg": 1034.9850000000001,
+    "early_july_avg": 1091.2966666666669,
+    "early_sep_avg": 790.36,
+    "five_day_avg": 1066.0666666666668,
+    "seven_day_avg": 953.4433333333335
+  },
+  "queries_executed": 6,
+  "queries_successful": 6,
+  "queries_failed": 0,
+  "family_offers_found": 6,
+  "timestamp": "2026-04-07T20:36:43.391Z"
+}
