@@ -113,12 +113,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const safeTicketId = body.ticketId || null;
+    const safeFareFamilyId = body.fareFamilyId || null;
+    const safePnr = body.pnr || null;
+
     const params: CreateSearchJobParams = {
-      p_ticket_id: body.ticketId || null,
-      p_pnr: body.pnr || null,
+      p_ticket_id: safeTicketId,
+      p_pnr: safePnr,
       p_carrier_iata: body.carrierIata,
       p_booking_class: body.bookingClass,
-      p_fare_family_id: body.fareFamilyId || null,
+      p_fare_family_id: safeFareFamilyId,
       p_parity_tier: body.parityTier ?? null,
       p_anchor_base_cost: body.anchorBaseCost,
       p_search_window_start: body.searchWindowStart,

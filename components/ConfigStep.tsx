@@ -290,77 +290,51 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
         </Alert>
       )}
 
-      {/* FRESH MODE: Route Configuration */}
-      <Card className="p-4 border-cyan-900/50 bg-cyan-950/20 space-y-3">
+      {/* LOCKED ROUTE: Read-only confirmation of route from Step 1 */}
+      <Card className="p-4 border-cyan-900/50 bg-cyan-950/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Route className="w-4 h-4 text-cyan-400" />
             <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wide">
-              Route Configuration
+              LOCKED ROUTE
             </h3>
           </div>
-          <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
-            FRESH MODE
+          <Badge variant="outline" className="text-[10px] text-cyan-400 border-cyan-500/50 bg-cyan-950/30">
+            READ ONLY
           </Badge>
         </div>
-        <p className="text-[10px] text-slate-400">
-          Required for manual searches. Pre-filled if ticket was parsed from PDF.
+        <p className="text-[10px] text-slate-400 mt-1 mb-3">
+          Route configured in Step 1. Edit not permitted to maintain data integrity.
         </p>
         <div className="grid grid-cols-3 gap-2">
-          <div>
-            <Label htmlFor="origin" className="text-slate-400 text-xs mb-1">
-              Origin *
-            </Label>
-            <Input
-              id="origin"
-              type="text"
-              maxLength={3}
-              placeholder="e.g., CAI"
-              value={ticket.origin || ''}
-              onChange={(e) => setTicket({ origin: e.target.value.toUpperCase() })}
-              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
-            />
+          <div className="border border-slate-800 bg-slate-950/50 p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase mb-1">Origin</div>
+            <div className="text-lg font-mono text-cyan-400 font-bold tracking-widest">
+              {ticket.origin || '---'}
+            </div>
           </div>
-          <div>
-            <Label htmlFor="destination" className="text-slate-400 text-xs mb-1">
-              Destination *
-            </Label>
-            <Input
-              id="destination"
-              type="text"
-              maxLength={3}
-              placeholder="e.g., ATH"
-              value={ticket.destination || ''}
-              onChange={(e) => setTicket({ destination: e.target.value.toUpperCase() })}
-              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
-            />
+          <div className="border border-slate-800 bg-slate-950/50 p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase mb-1">Destination</div>
+            <div className="text-lg font-mono text-cyan-400 font-bold tracking-widest">
+              {ticket.destination || '---'}
+            </div>
           </div>
-          <div>
-            <Label htmlFor="carrier" className="text-slate-400 text-xs mb-1">
-              Carrier *
-            </Label>
-            <Input
-              id="carrier"
-              type="text"
-              maxLength={2}
-              placeholder="e.g., A3"
-              value={ticket.carrier || ''}
-              onChange={(e) => setTicket({ carrier: e.target.value.toUpperCase() })}
-              className="bg-slate-950 border-slate-800 text-xs font-mono text-center tracking-widest"
-            />
+          <div className="border border-slate-800 bg-slate-950/50 p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase mb-1">Carrier</div>
+            <div className="text-lg font-mono text-cyan-400 font-bold tracking-widest">
+              {ticket.carrier || '---'}
+            </div>
           </div>
         </div>
+        {(!ticket.origin || !ticket.destination || !ticket.carrier) && (
+          <Alert variant="destructive" className="mt-3 py-2 border-red-900/50 bg-red-950/20">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            <AlertDescription className="text-[11px] text-red-200">
+              <strong>Missing Route:</strong> Complete Step 1 to configure route.
+            </AlertDescription>
+          </Alert>
+        )}
       </Card>
-
-      {/* Route Validation Warning */}
-      {(!ticket.origin || !ticket.destination || !ticket.carrier) && (
-        <Alert variant="destructive" className="py-2 border-red-900/50 bg-red-950/20">
-          <AlertTriangle className="h-3 w-3 shrink-0" />
-          <AlertDescription className="text-[11px] text-red-200">
-            <strong>Missing Route Data:</strong> You must provide Origin, Destination, and Carrier to initiate a sweep.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <form onSubmit={handleSubmit}>
         <Card className="p-4 border-slate-800 bg-slate-900/50 space-y-4">
@@ -662,7 +636,7 @@ export function ConfigStep({ onNext, onBack }: { onNext: () => void; onBack: () 
           </Button>
           <Button
             type="submit"
-            disabled={!isConfigValid() || !ticket.origin || !ticket.destination || !ticket.carrier || (isTicketExpired() && !isRebookingMode()) || isSubmitting}
+            disabled={!isConfigValid() || !ticket.origin || !ticket.destination || !ticket.carrier || isSubmitting}
             className="px-6 text-xs"
           >
             {isSubmitting ? 'Initializing...' : 'Orchestrate Sweep'}

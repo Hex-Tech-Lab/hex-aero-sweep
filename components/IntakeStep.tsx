@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Upload, CircleCheck as CheckCircle2, Database } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, CircleCheck as CheckCircle2, Database, Plane, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ProcessingState = 'idle' | 'processing' | 'authenticated';
+type IntakeMode = 'rebook' | 'fresh';
 
 const PROCESSING_MESSAGES = [
   'ESTABLISHING GDS HANDSHAKE...',
@@ -26,6 +28,7 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
   const [progress, setProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [intakeMode, setIntakeMode] = useState<IntakeMode>('rebook');
   const { ticket, setTicket, isTicketValid, resetStore } = useTicketStore();
   const { addLog } = useTelemetryStore();
 
@@ -267,6 +270,69 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
     }
   };
 
+  const handleFreshModeSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const origin = ticket.origin?.trim().toUpperCase();
+    const destination = ticket.destination?.trim().toUpperCase();
+    const carrier = ticket.carrier?.trim().toUpperCase();
+
+    if (!origin || origin.length !== 3) {
+      toast.error('Origin must be a 3-letter IATA code');
+      return;
+    }
+    if (!destination || destination.length !== 3) {
+      toast.error('Destination must be a 3-letter IATA code');
+      return;
+    }
+    if (!carrier || carrier.length !== 2) {
+      toast.error('Carrier must be a 2-letter IATA code');
+      return;
+    }
+
+    addLog({
+      source: 'SYSTEM',
+      type: 'REQUEST',
+      message: `Fresh Mode: Route ${origin}-${destination} on ${carrier}`,
+      payload: { origin, destination, carrier }
+    });
+
+    const mockIssueDate = new Date();
+    mockIssueDate.setDate(mockIssueDate.getDate() - 30);
+    const mockExpirationDate = new Date(mockIssueDate);
+    mockExpirationDate.setFullYear(mockExpirationDate.getFullYear() + 1);
+
+    setTicket({
+      pnr: 'FRESH',
+      primaryPassengerLastName: 'ANALYST',
+      passengers: ['Adult Passenger'],
+      carrier: carrier,
+      origin: origin,
+      destination: destination,
+      bookingClass: 'Y',
+      fareClass: 'ECONOMY',
+      baseCost: 0,
+      issueDate: mockIssueDate,
+      expirationDate: mockExpirationDate,
+      departureDate: null,
+      passengerBreakdown: {
+        adults: 1,
+        children: 0,
+        infants: 0,
+        passengerTypeSource: 'FRESH_MODE',
+      },
+      rules: {
+        validity: 'Manual entry',
+        luggage: 'Check carrier policy',
+        cancellation: 'Subject to fare rules',
+      },
+    });
+
+    setProcessingState('authenticated');
+    toast.success(`Route ${origin}-${destination} on ${carrier} configured`);
+    onNext();
+  }, [ticket, setTicket, addLog, onNext]);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       handlePDFUpload(acceptedFiles[0]);
@@ -412,85 +478,183 @@ export function IntakeStep({ onNext }: { onNext: () => void }) {
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed bg-transparent min-h-[250px] flex flex-col items-center justify-center cursor-pointer transition-colors ${
-            isDragActive
-              ? 'border-indigo-500 bg-indigo-500/10'
-              : 'border-slate-800 hover:border-slate-700'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <Upload className="w-12 h-12 text-slate-700 mb-4" />
-          <span className="uppercase font-bold text-slate-600 text-sm tracking-wider">
-            {isDragActive ? 'DROP FILE HERE' : 'DROP E-TICKET PDF'}
-          </span>
-          <span className="text-[10px] text-slate-700 mt-2">
-            GDS INTEGRATION ACTIVE
-          </span>
-        </div>
+      <Tabs value={intakeMode} onValueChange={(v) => setIntakeMode(v as IntakeMode)} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-slate-900 border border-slate-800 mb-6">
+          <TabsTrigger value="rebook" className="text-xs uppercase tracking-wide data-[state=active]:bg-cyan-950 data-[state=active]:text-cyan-400">
+            <RefreshCw className="w-3 h-3 mr-2" />
+            Rebook Mode
+          </TabsTrigger>
+          <TabsTrigger value="fresh" className="text-xs uppercase tracking-wide data-[state=active]:bg-cyan-950 data-[state=active]:text-cyan-400">
+            <Plane className="w-3 h-3 mr-2" />
+            Fresh Mode
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="border border-slate-800 bg-transparent p-6 min-h-[250px] flex flex-col">
-          <div className="text-xs text-center text-slate-500 uppercase mb-8 tracking-wide">
-            MANUAL GDS LOOKUP
-          </div>
-
-          <form onSubmit={handleGDSSync} className="flex-1 flex flex-col">
-            <div className="flex gap-4 mb-6">
-              <div className="flex-1">
-                <Label
-                  htmlFor="pnr"
-                  className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
-                >
-                  LOCATOR (PNR)
-                </Label>
-                <Input
-                  id="pnr"
-                  value={ticket.pnr}
-                  onChange={(e) =>
-                    setTicket({ pnr: e.target.value.toUpperCase() })
-                  }
-                  placeholder="ABC123"
-                  maxLength={6}
-                  required
-                  className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10"
-                />
-              </div>
-
-              <div className="flex-1">
-                <Label
-                  htmlFor="primaryPassengerLastName"
-                  className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
-                >
-                  ANALYST SIGN
-                </Label>
-                <Input
-                  id="primaryPassengerLastName"
-                  value={ticket.primaryPassengerLastName}
-                  onChange={(e) =>
-                    setTicket({ primaryPassengerLastName: e.target.value.toUpperCase() })
-                  }
-                  placeholder="SMITH"
-                  required
-                  className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10"
-                />
-              </div>
+        <TabsContent value="rebook" className="space-y-4">
+          <div className="grid grid-cols-2 gap-6">
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed bg-transparent min-h-[250px] flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                isDragActive
+                  ? 'border-indigo-500 bg-indigo-500/10'
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <Upload className="w-12 h-12 text-slate-700 mb-4" />
+              <span className="uppercase font-bold text-slate-600 text-sm tracking-wider">
+                {isDragActive ? 'DROP FILE HERE' : 'DROP E-TICKET PDF'}
+              </span>
+              <span className="text-[10px] text-slate-700 mt-2">
+                GDS INTEGRATION ACTIVE
+              </span>
             </div>
 
-            <div className="mt-auto">
+            <div className="border border-slate-800 bg-transparent p-6 min-h-[250px] flex flex-col">
+              <div className="text-xs text-center text-slate-500 uppercase mb-8 tracking-wide">
+                MANUAL GDS LOOKUP
+              </div>
+
+              <form onSubmit={handleGDSSync} className="flex-1 flex flex-col">
+                <div className="flex gap-4 mb-6">
+                  <div className="flex-1">
+                    <Label
+                      htmlFor="pnr"
+                      className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
+                    >
+                      LOCATOR (PNR)
+                    </Label>
+                    <Input
+                      id="pnr"
+                      value={ticket.pnr}
+                      onChange={(e) =>
+                        setTicket({ pnr: e.target.value.toUpperCase() })
+                      }
+                      placeholder="ABC123"
+                      maxLength={6}
+                      required
+                      className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10"
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <Label
+                      htmlFor="primaryPassengerLastName"
+                      className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
+                    >
+                      ANALYST SIGN
+                    </Label>
+                    <Input
+                      id="primaryPassengerLastName"
+                      value={ticket.primaryPassengerLastName}
+                      onChange={(e) =>
+                        setTicket({ primaryPassengerLastName: e.target.value.toUpperCase() })
+                      }
+                      placeholder="SMITH"
+                      required
+                      className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-auto">
+                  <Button
+                    type="submit"
+                    disabled={!ticket.pnr || !ticket.primaryPassengerLastName || isParsing}
+                    className="w-full bg-[#0f172a] hover:bg-cyan-900 border border-cyan-500/30 text-cyan-400 h-11"
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    SYNC RECORD
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="fresh">
+          <div className="border border-slate-800 bg-transparent p-6">
+            <div className="text-xs text-center text-slate-500 uppercase mb-6 tracking-wide">
+              FRESH ROUTE CONFIGURATION
+            </div>
+            <p className="text-[10px] text-slate-400 text-center mb-8">
+              Enter route details for a fresh price sweep without existing ticket
+            </p>
+
+            <form onSubmit={handleFreshModeSubmit} className="max-w-md mx-auto space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label
+                    htmlFor="fresh-origin"
+                    className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
+                  >
+                    Origin
+                  </Label>
+                  <Input
+                    id="fresh-origin"
+                    value={ticket.origin || ''}
+                    onChange={(e) =>
+                      setTicket({ origin: e.target.value.toUpperCase() })
+                    }
+                    placeholder="CAI"
+                    maxLength={3}
+                    required
+                    className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10 text-center tracking-widest"
+                  />
+                </div>
+
+                <div>
+                  <Label
+                    htmlFor="fresh-destination"
+                    className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
+                  >
+                    Destination
+                  </Label>
+                  <Input
+                    id="fresh-destination"
+                    value={ticket.destination || ''}
+                    onChange={(e) =>
+                      setTicket({ destination: e.target.value.toUpperCase() })
+                    }
+                    placeholder="ATH"
+                    maxLength={3}
+                    required
+                    className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10 text-center tracking-widest"
+                  />
+                </div>
+
+                <div>
+                  <Label
+                    htmlFor="fresh-carrier"
+                    className="text-[10px] text-slate-500 uppercase mb-2 block font-mono"
+                  >
+                    Carrier
+                  </Label>
+                  <Input
+                    id="fresh-carrier"
+                    value={ticket.carrier || ''}
+                    onChange={(e) =>
+                      setTicket({ carrier: e.target.value.toUpperCase() })
+                    }
+                    placeholder="A3"
+                    maxLength={2}
+                    required
+                    className="uppercase bg-transparent border-slate-800 text-slate-200 font-mono text-sm h-10 text-center tracking-widest"
+                  />
+                </div>
+              </div>
+
               <Button
                 type="submit"
-                disabled={!ticket.pnr || !ticket.primaryPassengerLastName || isParsing}
-                className="w-full bg-[#0f172a] hover:bg-cyan-900 border border-cyan-500/30 text-cyan-400 h-11"
+                className="w-full bg-cyan-600 hover:bg-cyan-700 border-0 text-white h-11"
               >
-                <Database className="w-4 h-4 mr-2" />
-                SYNC RECORD
+                <Plane className="w-4 h-4 mr-2" />
+                Configure Route
               </Button>
-            </div>
-          </form>
-        </div>
-      </div>
+            </form>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
